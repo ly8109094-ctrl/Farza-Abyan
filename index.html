@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فرزة أبين - نظام إدارة الفرزة والنداء الصوتي الحي</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Cairo Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#035480',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        amber: {
+                            400: '#fbbf24',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        }
+                    },
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+
+        @keyframes alertFlash {
+            0%, 100% { background-color: #ef4444; border-color: #fef08a; transform: scale(1); }
+            50% { background-color: #b91c1c; border-color: #ffffff; transform: scale(1.02); }
+        }
+        .animate-alert-flash {
+            animation: alertFlash 0.8s infinite ease-in-out;
+        }
+
+        @keyframes activePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+            50% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
+        }
+        .pulse-call {
+            animation: activePulse 1.8s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+    <!-- TOP CONTROL BAR -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-gradient-to-tr from-amber-500 to-amber-300 p-2.5 rounded-2xl text-slate-950 font-black shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-van-shuttle text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-black text-lg leading-none text-white">فرزة أبين - الهايص</h1>
+                    <p class="text-xs text-amber-400 font-semibold mt-1">نظام المزامنة والنداء الصوتي الحي</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 bg-slate-800 p-1.5 rounded-2xl border border-slate-700/80">
+                <button id="btnRoleDelegate" onclick="switchRole('delegate')" class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition duration-200 flex items-center gap-1.5 bg-brand-600 text-white shadow-md">
+                    <i class="fa-solid fa-user-gear"></i>
+                    <span>واجهة المندوب</span>
+                </button>
+                <button id="btnRoleDriver" onclick="switchRole('driver')" class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition duration-200 flex items-center gap-1.5 text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <span>شاشة السائقين</span>
+                </button>
+                <button onclick="openDriverWindow()" title="فتح شاشة السائقين في نافذة مستقلة للربط بين جهازين" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-2 rounded-xl text-xs transition">
+                    <i class="fa-solid fa-up-right-from-square"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN APP WRAPPER -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-3 sm:p-5 flex flex-col gap-6">
+
+        <!-- ALERT OVERLAY FOR DRIVERS -->
+        <div id="driverCallAlert" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md p-4 flex flex-col items-center justify-center text-center">
+            <div class="animate-alert-flash border-4 rounded-3xl p-6 sm:p-10 max-w-lg w-full text-white shadow-2xl space-y-5">
+                <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto text-4xl text-amber-300">
+                    <i class="fa-solid fa-bullhorn animate-bounce"></i>
+                </div>
+                <div>
+                    <span class="bg-black/40 text-amber-300 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">تنبيه عاجل - نداء التحميل الصوتي</span>
+                    <h2 id="alertDriverName" class="text-2xl sm:text-3xl font-black mt-2">--</h2>
+                    <p id="alertBusInfo" class="text-base text-slate-100 mt-1 font-mono font-bold"></p>
+                </div>
+                
+                <!-- مشغل التسجيل الصوتي الحقيقي للمندوب -->
+                <div id="alertAudioContainer" class="hidden bg-black/40 p-3 rounded-2xl border border-white/20">
+                    <p class="text-xs text-amber-300 mb-2 font-bold">🎙️ استمع لنداء المندوب بصوته:</p>
+                    <audio id="alertAudioPlayer" controls class="w-full"></audio>
+                </div>
+
+                <div class="bg-black/30 p-3 rounded-2xl border border-white/10 text-right space-y-1">
+                    <p class="text-xs text-slate-200">الوجهة المطلوب التحميل إليها:</p>
+                    <h3 id="alertDestination" class="text-xl font-extrabold text-amber-300">--</h3>
+                </div>
+                <button onclick="dismissAlert()" class="w-full bg-white text-slate-900 font-black py-3 rounded-2xl shadow-lg active:scale-95 transition">
+                    حسناً، أنا قادم الآن
+                </button>
+            </div>
+        </div>
+
+        <!-- 1. DELEGATE VIEW -->
+        <div id="viewDelegate" class="space-y-5">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">طابور الانتظار</p>
+                        <h3 id="delStatWaiting" class="text-2xl font-black text-amber-400">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                    </div>
+                </div>
+                <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">قيد التحميل</p>
+                        <h3 id="delStatActive" class="text-2xl font-black text-emerald-400">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-bullhorn"></i>
+                    </div>
+                </div>
+                <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">رحلات غادرت</p>
+                        <h3 id="delStatDeparted" class="text-2xl font-black text-brand-400">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-van-shuttle"></i>
+                    </div>
+                </div>
+                <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">إجمالي ركاب</p>
+                        <h3 id="delStatPassengers" class="text-2xl font-black text-purple-400">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-xs font-bold text-slate-300">المزامنة المباشرة شغال</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="openModal('addBusModal')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition shadow-lg">
+                        <i class="fa-solid fa-plus text-sm"></i>
+                        <span>تسجيل باص جديد</span>
+                    </button>
+                    <button onclick="resetDayData()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold px-3 py-2 rounded-xl text-xs transition">
+                        <i class="fa-solid fa-rotate-right ml-1"></i> تصفير اليوم
+                    </button>
+                </div>
+            </div>
+
+            <!-- ACTIVE LOADING BANNER -->
+            <div id="activeCallBanner" class="hidden bg-gradient-to-r from-emerald-950 to-slate-900 border-2 border-emerald-500/80 p-4 rounded-3xl shadow-xl pulse-call space-y-3">
+                <div class="flex justify-between items-center border-b border-emerald-800/50 pb-2">
+                    <span class="bg-emerald-500 text-slate-950 px-3 py-0.5 rounded-full text-xs font-black">الباص جاري تحميله حالياً</span>
+                    <span id="activeCallTime" class="text-xs text-emerald-300 font-mono"></span>
+                </div>
+                <div class="flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                        <h3 id="activeDriverName" class="text-xl font-black text-white">--</h3>
+                        <p id="activeBusInfo" class="text-xs text-slate-300 font-mono font-bold mt-0.5"></p>
+                    </div>
+                    <div class="bg-slate-900/80 px-4 py-2 rounded-2xl border border-emerald-500/30">
+                        <p class="text-[10px] text-slate-400">الوجهة:</p>
+                        <p id="activeDestination" class="text-base font-extrabold text-amber-400">--</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="finishLoadingAndDepart()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition shadow-lg">
+                            <i class="fa-solid fa-circle-check"></i> اكتمل التحميل والمغادرة
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- QUEUE TABLE -->
+            <div class="bg-slate-800/90 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
+                <div class="p-4 bg-slate-900/80 border-b border-slate-700 flex justify-between items-center">
+                    <h2 class="font-extrabold text-sm text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol text-amber-400"></i> طابور الانتظار الجاري للفرزة
+                    </h2>
+                    <span id="queueCountBadge" class="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs px-2.5 py-1 rounded-xl font-extrabold">0 باص</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-xs">
+                        <thead class="bg-slate-900/50 text-slate-400 font-bold border-b border-slate-700">
+                            <tr>
+                                <th class="p-3 text-center w-12">الدور</th>
+                                <th class="p-3">اسم السائق</th>
+                                <th class="p-3">رقم الباص</th>
+                                <th class="p-3">الوجهة</th>
+                                <th class="p-3">وقت التسجيل</th>
+                                <th class="p-3 text-center">الترتيب</th>
+                                <th class="p-3 text-center">الإجراء والنداء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="delegateQueueBody" class="divide-y divide-slate-700/60 font-medium"></tbody>
+                    </table>
+                </div>
+                <div id="emptyQueueMsg" class="hidden p-8 text-center text-slate-500 space-y-2">
+                    <i class="fa-solid fa-bus text-3xl text-slate-600"></i>
+                    <p class="text-xs">لا يوجد أي باصات في طابور الانتظار حالياً.</p>
+                </div>
+            </div>
+
+            <!-- DEPARTED LOG -->
+            <div class="bg-slate-800/90 rounded-2xl border border-slate-700 p-4 space-y-3">
+                <h3 class="font-bold text-xs text-slate-300 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-brand-400"></i> كشف الباصات المغادرة اليوم
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-xs">
+                        <thead class="bg-slate-900/50 text-slate-400 font-bold border-b border-slate-700">
+                            <tr>
+                                <th class="p-2">السائق</th>
+                                <th class="p-2">الباص</th>
+                                <th class="p-2">الوجهة</th>
+                                <th class="p-2 text-center">الركاب</th>
+                                <th class="p-2">وقت المغادرة</th>
+                                <th class="p-2 text-center">تراجع</th>
+                            </tr>
+                        </thead>
+                        <tbody id="delegateDepartedBody" class="divide-y divide-slate-700/40"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. DRIVER VIEW -->
+        <div id="viewDriver" class="space-y-5 hidden">
+            <div class="bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 p-5 rounded-3xl shadow-2xl border-2 border-amber-300 space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="bg-slate-950 text-amber-400 font-black text-[11px] px-3 py-1 rounded-full uppercase">صاحب الدور المطلوب للتحميل الآن</span>
+                    <span class="text-xs font-bold text-slate-900 font-mono">مباشر الفرزة</span>
+                </div>
+                <div id="driverActiveContent" class="space-y-2"></div>
+            </div>
+
+            <div class="bg-slate-800/90 p-4 rounded-2xl border border-slate-700 space-y-3">
+                <label class="block text-xs font-extrabold text-slate-300">
+                    <i class="fa-solid fa-magnifying-glass text-amber-400 ml-1"></i> ابحث عن دورك بالاسم أو رقم الباص:
+                </label>
+                <input type="text" id="driverSearchInput" oninput="renderDriverView()" placeholder="اكتب اسم السائق أو رقم الباص لمعرفة كم باقي عليك..." class="w-full bg-slate-900 text-white border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-amber-500">
+                <div id="driverSearchResult" class="hidden bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-300"></div>
+            </div>
+
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-extrabold text-sm text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol text-amber-400"></i> قائمة الأدوار المنتظرة بالطابور
+                    </h3>
+                </div>
+                <div id="driverQueueCards" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-3 mt-auto">
+        <div class="max-w-5xl mx-auto px-4 text-center text-[11px] text-slate-500 flex justify-between items-center">
+            <div>نظام فرزة باصات الهايص - محافظة أبين &copy; 2026</div>
+            <div class="text-slate-400"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block ml-1"></span> مزامنة حية مفعلة</div>
+        </div>
+    </footer>
+
+    <!-- MODAL: ADD NEW BUS -->
+    <div id="addBusModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-extrabold text-sm text-slate-100"><i class="fa-solid fa-bus text-amber-400 ml-1"></i> تسجيل باص جديد</h3>
+                <button onclick="closeModal('addBusModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleAddBus(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">اسم السائق الثلاثي *</label>
+                    <input type="text" id="inputDriverName" required placeholder="مثال: سالم علي المرقشي" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">رقم الباص / اللوحة *</label>
+                        <input type="text" id="inputBusNum" required placeholder="14500" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">الوجهة المستهدفة</label>
+                        <select id="inputPreferredDest" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                            <option value="عدن">عدن</option>
+                            <option value="زنجبار">زنجبار</option>
+                            <option value="جعار">جعار</option>
+                            <option value="شقرة">شقرة</option>
+                            <option value="لودر">لودر</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2.5 rounded-xl text-xs mt-2">إدراج في نهاية الطابور</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: TRIGGER VOICE CALL RECORDING (نداء صوتي بصوت المندوب) -->
+    <div id="triggerCallModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-extrabold text-sm text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-microphone text-emerald-400"></i> تسجيل نداء صوتي بصوتك للسائق
+                </h3>
+                <button onclick="closeModal('triggerCallModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <input type="hidden" id="callDriverId">
+                <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 space-y-1">
+                    <p class="text-[11px] text-slate-400">السائق المستدعى للتحميل:</p>
+                    <h4 id="callDriverName" class="font-black text-base text-amber-400"></h4>
+                    <p id="callBusNum" class="text-xs font-mono text-slate-300"></p>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">الوجهة:</label>
+                    <select id="callDestination" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-bold">
+                        <option value="عدن">عدن</option>
+                        <option value="زنجبار">زنجبار</option>
+                        <option value="جعار">جعار</option>
+                        <option value="شقرة">شقرة</option>
+                        <option value="لودر">لودر</option>
+                    </select>
+                </div>
+
+                <!-- أدوات التسجيل الصوتي -->
+                <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700 text-center space-y-3">
+                    <p id="recordingStatus" class="text-slate-300 font-bold">اضغط على زر التسجيل وتحدث بصوتك (مثال: تحرك يا أحمد إلى عدن)</p>
+                    
+                    <div class="flex justify-center gap-2">
+                        <button type="button" id="startRecBtn" onclick="startRecording()" class="bg-rose-600 hover:bg-rose-500 text-white font-black px-4 py-2.5 rounded-xl flex items-center gap-2">
+                            <i class="fa-solid fa-circle-dot animate-pulse"></i> بدء التسجيل
+                        </button>
+                        <button type="button" id="stopRecBtn" onclick="stopRecording()" disabled class="bg-slate-700 text-slate-400 font-black px-4 py-2.5 rounded-xl opacity-50">
+                            <i class="fa-solid fa-stop"></i> إيقاف
+                        </button>
+                    </div>
+
+                    <!-- مشغل معاينة الصوت قبل الإرسال -->
+                    <div id="audioPreviewContainer" class="hidden space-y-2">
+                        <p class="text-emerald-400 font-bold">تم تسجيل الصوت بنجاح! استمع إليه:</p>
+                        <audio id="audioPreview" controls class="w-full"></audio>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex gap-2">
+                    <button type="button" id="confirmCallBtn" onclick="confirmVoiceCall()" disabled class="flex-1 bg-emerald-500 text-slate-950 font-black py-2.5 rounded-xl opacity-50 cursor-not-allowed">
+                        إرسال النداء الصوتي للسائقين
+                    </button>
+                    <button type="button" onclick="closeModal('triggerCallModal')" class="bg-slate-800 text-slate-300 font-bold px-4 py-2.5 rounded-xl">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        // Firebase Configuration & FCM Initialization
+        const firebaseConfig = {
+            apiKey: "AIzaSyBlukcCerg0JmlZJIKH_MMnfHqYT16VIPI",
+            authDomain: "farza-abyan.firebaseapp.com",
+            projectId: "farza-abyan",
+            storageBucket: "farza-abyan.firebasestorage.app",
+            messagingSenderId: "862766729352",
+            appId: "1:862766729352:web:ca548168c1b14ce27f773d"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const messaging = firebase.messaging();
+
+        // Request Push Notification Permission & FCM Token
+        function initFirebaseMessaging() {
+            if ('Notification' in window && 'serviceWorker' in navigator) {
+                Notification.requestPermission().then((permission) => {
+                    if (permission === 'granted') {
+                        navigator.serviceWorker.register('firebase-messaging-sw.js')
+                            .then((registration) => {
+                                return messaging.getToken({
+                                    serviceWorkerRegistration: registration,
+                                    vapidKey: 'BFd61U_dxJ4IZQJA0JcmaG3LFRzRWn8gJhlG8A1vnp_DRcbdfAeqWM1Ec8PGFwaBlESYUIOu21FwOPv8evvvAY8'
+                                });
+                            })
+                            .then((token) => {
+                                if (token) {
+                                    console.log('FCM Token acquired successfully:', token);
+                                }
+                            })
+                            .catch((err) => {
+                                console.log('Error retrieving FCM token:', err);
+                            });
+                    }
+                });
+            }
+        }
+
+        const STORAGE_KEY = 'abyan_farza_live_sync_db_v3';
+        const BROADCAST_CHANNEL_NAME = 'abyan_farza_channel_v3';
+        let syncChannel;
+        try { syncChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME); } catch (e) {}
+
+        let appData = {
+            currentRole: 'delegate',
+            activeCall: null,
+            drivers: []
+        };
+
+        // متغيرات التسجيل الصوتي
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedAudioBlobUrl = null;
+
+        window.onload = function() {
+            loadFromStorage();
+            if (!appData.drivers || appData.drivers.length === 0) seedData();
+            
+            // تهيئة إشعارات الويب من فايربيس
+            initFirebaseMessaging();
+
+            if (syncChannel) {
+                syncChannel.onmessage = function(event) {
+                    if (event.data && event.data.type === 'SYNC_UPDATE') {
+                        appData.drivers = event.data.drivers;
+                        appData.activeCall = event.data.activeCall;
+                        renderAll();
+
+                        if (event.data.action === 'CALL_DRIVER' && appData.currentRole === 'driver') {
+                            triggerDriverScreenAlert(event.data.callInfo);
+                        }
+                    }
+                };
+            }
+            renderAll();
+        };
+
+        function seedData() {
+            const now = Date.now();
+            appData.drivers = [
+                { id: '1', name: 'أحمد صالح المرقشي', busNum: '10293 / أبين', prefDest: 'عدن', status: 'WAITING', regTime: now - 3600000 * 2 },
+                { id: '2', name: 'عمار محسن العمودي', busNum: '5812 / أبين', prefDest: 'زنجبار', status: 'WAITING', regTime: now - 3600000 * 1.5 }
+            ];
+            saveAndSync('SEED');
+        }
+
+        function saveAndSync(actionName = 'UPDATE', extraPayload = {}) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    drivers: appData.drivers,
+                    activeCall: appData.activeCall
+                }));
+            } catch(e) {}
+
+            if (syncChannel) {
+                syncChannel.postMessage({
+                    type: 'SYNC_UPDATE',
+                    action: actionName,
+                    drivers: appData.drivers,
+                    activeCall: appData.activeCall,
+                    ...extraPayload
+                });
+            }
+        }
+
+        function loadFromStorage() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appData.drivers = parsed.drivers || [];
+                    appData.activeCall = parsed.activeCall || null;
+                } catch(e) {}
+            }
+        }
+
+        function switchRole(role) {
+            appData.currentRole = role;
+            const btnDel = document.getElementById('btnRoleDelegate');
+            const btnDrv = document.getElementById('btnRoleDriver');
+            const viewDel = document.getElementById('viewDelegate');
+            const viewDrv = document.getElementById('viewDriver');
+
+            if (role === 'delegate') {
+                viewDel.classList.remove('hidden');
+                viewDrv.classList.add('hidden');
+                btnDel.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-brand-600 text-white shadow-md";
+                btnDrv.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-400 hover:text-white";
+            } else {
+                viewDel.classList.add('hidden');
+                viewDrv.classList.remove('hidden');
+                btnDrv.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-amber-500 text-slate-950 shadow-md";
+                btnDel.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-400 hover:text-white";
+            }
+            renderAll();
+        }
+
+        function openDriverWindow() {
+            window.open(window.location.href, '_blank', 'width=500,height=800');
+        }
+
+        function renderAll() {
+            renderDelegateStats();
+            renderDelegateQueue();
+            renderDelegateDeparted();
+            renderActiveCallBanner();
+            renderDriverView();
+        }
+
+        function renderDelegateStats() {
+            const waiting = appData.drivers.filter(d => d.status === 'WAITING').length;
+            const departed = appData.drivers.filter(d => d.status === 'DEPARTED').length;
+            const active = appData.activeCall ? 1 : 0;
+            document.getElementById('delStatWaiting').innerText = waiting;
+            document.getElementById('delStatActive').innerText = active;
+            document.getElementById('delStatDeparted').innerText = departed;
+            document.getElementById('delStatPassengers').innerText = departed * 14;
+            document.getElementById('queueCountBadge').innerText = `${waiting} باص`;
+        }
+
+        function renderDelegateQueue() {
+            const tbody = document.getElementById('delegateQueueBody');
+            const emptyMsg = document.getElementById('emptyQueueMsg');
+            tbody.innerHTML = '';
+            const waitingList = appData.drivers.filter(d => d.status === 'WAITING');
+
+            if (waitingList.length === 0) {
+                emptyMsg.classList.remove('hidden');
+                return;
+            }
+            emptyMsg.classList.add('hidden');
+
+            waitingList.forEach((driver, idx) => {
+                const turnNum = idx + 1;
+                const isNext = (idx === 0);
+                const tr = document.createElement('tr');
+                tr.className = isNext ? 'bg-amber-500/10 font-bold border-l-4 border-amber-500' : 'hover:bg-slate-800/40';
+
+                tr.innerHTML = `
+                    <td class="p-3 text-center"><span class="w-6 h-6 rounded-lg ${isNext ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-700 text-slate-300'} inline-flex items-center justify-center text-xs">${turnNum}</span></td>
+                    <td class="p-3 font-bold text-white">${escapeHtml(driver.name)}</td>
+                    <td class="p-3"><span class="font-mono bg-slate-900 px-2 py-1 rounded text-amber-300">${escapeHtml(driver.busNum)}</span></td>
+                    <td class="p-3 text-slate-300">${escapeHtml(driver.prefDest || 'غير محدد')}</td>
+                    <td class="p-3 text-slate-400 text-[11px]">${new Date(driver.regTime).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="moveQueue('${driver.id}', -1)" ${idx === 0 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-chevron-up"></i></button>
+                        <button onclick="moveQueue('${driver.id}', 1)" ${idx === waitingList.length - 1 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-chevron-down"></i></button>
+                    </td>
+                    <td class="p-3 text-center">
+                        <button onclick="openTriggerCallModal('${driver.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs">
+                            <i class="fa-solid fa-microphone"></i> نداء صوتي
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function moveQueue(id, direction) {
+            const waitingIndices = [];
+            appData.drivers.forEach((d, index) => { if (d.status === 'WAITING') waitingIndices.push(index); });
+            const currWaitingPos = waitingIndices.findIndex(idx => appData.drivers[idx].id === id);
+            if (currWaitingPos === -1) return;
+            const targetWaitingPos = currWaitingPos + direction;
+            if (targetWaitingPos < 0 || targetWaitingPos >= waitingIndices.length) return;
+
+            const actualCurrIdx = waitingIndices[currWaitingPos];
+            const actualTargetIdx = waitingIndices[targetWaitingPos];
+            const temp = appData.drivers[actualCurrIdx];
+            appData.drivers[actualCurrIdx] = appData.drivers[actualTargetIdx];
+            appData.drivers[actualTargetIdx] = temp;
+
+            saveAndSync('MOVE_QUEUE');
+            renderAll();
+        }
+
+        function renderActiveCallBanner() {
+            const banner = document.getElementById('activeCallBanner');
+            if (!appData.activeCall) { banner.classList.add('hidden'); return; }
+            banner.classList.remove('hidden');
+            document.getElementById('activeDriverName').innerText = appData.activeCall.driverName;
+            document.getElementById('activeBusInfo').innerText = `الباص: ${appData.activeCall.busNum}`;
+            document.getElementById('activeDestination').innerText = appData.activeCall.destination;
+            document.getElementById('activeCallTime').innerText = 'تم النداء: ' + new Date(appData.activeCall.timestamp).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function renderDelegateDeparted() {
+            const tbody = document.getElementById('delegateDepartedBody');
+            tbody.innerHTML = '';
+            const departed = appData.drivers.filter(d => d.status === 'DEPARTED');
+            if (departed.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">لا توجد رحلات مغادرة اليوم.</td></tr>`;
+                return;
+            }
+            departed.forEach(d => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-800/30">
+                        <td class="p-2 font-bold text-white">${escapeHtml(d.name)}</td>
+                        <td class="p-2 font-mono text-amber-300">${escapeHtml(d.busNum)}</td>
+                        <td class="p-2 text-slate-300 font-bold">${escapeHtml(d.destination)}</td>
+                        <td class="p-2 text-center text-emerald-400 font-bold">${d.passengers || 14}</td>
+                        <td class="p-2 text-slate-400">${new Date(d.departTime).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td class="p-2 text-center"><button onclick="revertDeparted('${d.id}')" class="text-slate-400 hover:text-amber-400"><i class="fa-solid fa-rotate-left"></i></button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderDriverView() {
+            const activeContent = document.getElementById('driverActiveContent');
+            const queueCards = document.getElementById('driverQueueCards');
+
+            if (appData.activeCall) {
+                activeContent.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-center gap-3 bg-slate-950/40 p-3 rounded-2xl border border-amber-400/30">
+                        <div>
+                            <h2 class="text-2xl font-black text-white">${escapeHtml(appData.activeCall.driverName)}</h2>
+                            <p class="text-xs font-mono font-bold text-slate-900 bg-amber-400 inline-block px-2 py-0.5 rounded mt-1">${escapeHtml(appData.activeCall.busNum)}</p>
+                        </div>
+                        <div class="text-left space-y-2">
+                            <span class="text-xs font-bold text-slate-900 block">الوجهة: <strong class="bg-white px-2 py-1 rounded">${escapeHtml(appData.activeCall.destination)}</strong></span>
+                            ${appData.activeCall.audioUrl ? `<audio controls src="${appData.activeCall.audioUrl}" class="h-9 w-48"></audio>` : ''}
+                        </div>
+                    </div>
+                `;
+            } else {
+                activeContent.innerHTML = `<div class="p-3 text-center text-slate-900 font-extrabold text-xs">لا يوجد نداء حالياً. تابع دورك بالطابور أدناه.</div>`;
+            }
+
+            queueCards.innerHTML = '';
+            const waitingList = appData.drivers.filter(d => d.status === 'WAITING');
+            waitingList.forEach((driver, idx) => {
+                const turnNum = idx + 1;
+                const isNext = (idx === 0);
+                queueCards.innerHTML += `
+                    <div class="p-4 rounded-2xl border ${isNext ? 'bg-gradient-to-br from-amber-500/20 to-slate-800 border-amber-500/60 shadow-lg' : 'bg-slate-800/80 border-slate-700'}">
+                        <div class="flex justify-between items-start">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-8 h-8 rounded-xl ${isNext ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-700 text-slate-300'} flex items-center justify-center text-sm">${turnNum}</span>
+                                <div>
+                                    <h4 class="font-black text-white text-sm">${escapeHtml(driver.name)}</h4>
+                                    <p class="text-xs font-mono text-amber-300 font-bold">${escapeHtml(driver.busNum)}</p>
+                                </div>
+                            </div>
+                            ${isNext ? '<span class="bg-amber-500/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">التالي بالدور</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // ==========================================
+        // 🎙️ وظائف التسجيل الصوتي الحقيقي للمندوب
+        // ==========================================
+        function openTriggerCallModal(driverId) {
+            const driver = appData.drivers.find(d => d.id === driverId);
+            if (!driver) return;
+            document.getElementById('callDriverId').value = driver.id;
+            document.getElementById('callDriverName').innerText = driver.name;
+            document.getElementById('callBusNum').innerText = `رقم الباص: ${driver.busNum}`;
+            document.getElementById('callDestination').value = driver.prefDest || 'عدن';
+            
+            // إعادة ضبط حالة التسجيل
+            recordedAudioBlobUrl = null;
+            document.getElementById('audioPreviewContainer').classList.add('hidden');
+            document.getElementById('confirmCallBtn').disabled = true;
+            document.getElementById('confirmCallBtn').classList.add('opacity-50', 'cursor-not-allowed');
+
+            openModal('triggerCallModal');
+        }
+
+        async function startRecording() {
+            audioChunks = [];
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    recordedAudioBlobUrl = URL.createObjectURL(audioBlob);
+                    
+                    const previewAudio = document.getElementById('audioPreview');
+                    previewAudio.src = recordedAudioBlobUrl;
+                    document.getElementById('audioPreviewContainer').classList.remove('hidden');
+                    
+                    // تفعيل زر إرسال النداء
+                    const confirmBtn = document.getElementById('confirmCallBtn');
+                    confirmBtn.disabled = false;
+                    confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                };
+
+                mediaRecorder.start();
+                document.getElementById('startRecBtn').disabled = true;
+                document.getElementById('stopRecBtn').disabled = false;
+                document.getElementById('stopRecBtn').classList.remove('opacity-50');
+                document.getElementById('recordingStatus').innerText = "🔴 جاري التسجيل الآن... تحدث بصوتك بوضوح";
+            } catch (err) {
+                alert("تعذر الوصول إلى الميكروفون. يجدر التأكد من منح الإذن للمتصفح.");
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                document.getElementById('startRecBtn').disabled = false;
+                document.getElementById('stopRecBtn').disabled = true;
+                document.getElementById('stopRecBtn').classList.add('opacity-50');
+                document.getElementById('recordingStatus').innerText = "✅ تم الانتهاء من التسجيل. يمكنك الاستماع للصوت أدناه قبل الإرسال.";
+            }
+        }
+
+        function confirmVoiceCall() {
+            const id = document.getElementById('callDriverId').value;
+            const dest = document.getElementById('callDestination').value;
+            const driver = appData.drivers.find(d => d.id === id);
+
+            if (driver) {
+                appData.activeCall = {
+                    driverId: driver.id,
+                    driverName: driver.name,
+                    busNum: driver.busNum,
+                    destination: dest,
+                    audioUrl: recordedAudioBlobUrl, // رابط التسجيل الصوتي الحقيقي بصوتك
+                    timestamp: Date.now()
+                };
+
+                saveAndSync('CALL_DRIVER', { callInfo: appData.activeCall });
+                renderAll();
+                closeModal('triggerCallModal');
+            }
+        }
+
+        function finishLoadingAndDepart() {
+            if (!appData.activeCall) return;
+            const driver = appData.drivers.find(d => d.id === appData.activeCall.driverId);
+            if (driver) {
+                driver.status = 'DEPARTED';
+                driver.destination = appData.activeCall.destination;
+                driver.passengers = 14;
+                driver.departTime = Date.now();
+            }
+            appData.activeCall = null;
+            saveAndSync('DEPART_FINISH');
+            renderAll();
+        }
+
+        function revertDeparted(id) {
+            const driver = appData.drivers.find(d => d.id === id);
+            if (driver) {
+                driver.status = 'WAITING';
+                delete driver.destination; delete driver.passengers; delete driver.departTime;
+                saveAndSync('REVERT_DEPARTED');
+                renderAll();
+            }
+        }
+
+        function resetDayData() {
+            if (confirm('تصفير سجلات اليوم بالكامل؟')) {
+                appData.drivers = [];
+                appData.activeCall = null;
+                saveAndSync('RESET_DAY');
+                renderAll();
+            }
+        }
+
+        function handleAddBus(e) {
+            e.preventDefault();
+            const name = document.getElementById('inputDriverName').value.trim();
+            const busNum = document.getElementById('inputBusNum').value.trim();
+            const prefDest = document.getElementById('inputPreferredDest').value;
+            if (!name || !busNum) return;
+
+            appData.drivers.push({
+                id: Date.now().toString(),
+                name, busNum, prefDest,
+                status: 'WAITING',
+                regTime: Date.now()
+            });
+            saveAndSync('ADD_BUS');
+            renderAll();
+            closeModal('addBusModal');
+            document.getElementById('inputDriverName').value = '';
+            document.getElementById('inputBusNum').value = '';
+        }
+
+        function triggerDriverScreenAlert(callInfo) {
+            if (!callInfo) return;
+            document.getElementById('alertDriverName').innerText = callInfo.driverName;
+            document.getElementById('alertBusInfo').innerText = `الباص: ${callInfo.busNum}`;
+            document.getElementById('alertDestination').innerText = callInfo.destination;
+            
+            const audioPlayer = document.getElementById('alertAudioPlayer');
+            const audioContainer = document.getElementById('alertAudioContainer');
+            if (callInfo.audioUrl) {
+                audioPlayer.src = callInfo.audioUrl;
+                audioContainer.classList.remove('hidden');
+                audioPlayer.play().catch(e => console.log("Auto-play blocked"));
+            } else {
+                audioContainer.classList.add('hidden');
+            }
+
+            document.getElementById('driverCallAlert').classList.remove('hidden');
+        }
+
+        function dismissAlert() {
+            document.getElementById('driverCallAlert').classList.add('hidden');
+            const audioPlayer = document.getElementById('alertAudioPlayer');
+            audioPlayer.pause();
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
