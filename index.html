@@ -398,15 +398,15 @@
                 <div class="pt-2 flex gap-2">
         
                         <div class="d-flex gap-2 w-100">
-      <!-- الزر القديم: إرسال النداء الصوتي -->
-      <button type="button" id="confirmCallBtn" class="btn btn-success flex-grow-1" onclick="sendVoiceCall()">
-        إرسال النداء الصوتي للسائقين
-      </button>
-      
-      <!-- الزر الجديد: إرسال إشعار -->
-      <button type="button" class="btn btn-warning flex-grow-1" onclick="sendPushNotification()">
-        إرسال إشعار
-      </button>
+    <div class="d-flex gap-2 justify-content-between w-100">
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+  <div class="d-flex gap-2">
+    <button type="button" id="confirmCallBtn" class="btn btn-success">إرسال النداء الصوتي</button>
+    <button type="button" class="btn btn-warning" onclick="sendPushNotification()">إرسال إشعار</button>
+  </div>
+</div>
+  
+
     </div>
 <script>
   function sendPushNotification() {
