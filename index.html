@@ -11,8 +11,10 @@
     <!-- Google Cairo Font -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDKs (App, Realtime Database, Firestore, Messaging) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
 
     <script>
@@ -395,34 +397,21 @@
                     </div>
                 </div>
 
-                <div class="pt-2 flex gap-2">
-        
-                        <div class="d-flex gap-2 w-100">
-    <div class="d-flex gap-2 justify-content-between w-100">
-  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-  <div class="d-flex gap-2">
-    <button type="button" id="confirmCallBtn" class="btn btn-success">إرسال النداء الصوتي</button>
-    <button type="button" class="btn btn-warning" onclick="sendPushNotification()">إرسال إشعار</button>
-  </div>
-</div>
-  
-
-    </div>
-<script>
-  function sendPushNotification() {
-    firebase.database().ref('notifications_queue').push({
-      title: "تنبيه فرزة أبين 🚨",
-      body: "يوجد نداء وتنبيه جديد من إدارة الفرزة للسائقين",
-      timestamp: Date.now()
-    }).then(() => {
-      alert("تم إرسال الإشعار لجميع السائقين بنجاح! 🔔");
-    }).catch((error) => {
-      console.error("خطأ أثناء إرسال الإشعار: ", error);
-    });
-  }
-</script>
-
-                    
+                <!-- أزرار الإجراءات: إلغاء | إرسال إشعار | إرسال النداء الصوتي -->
+                <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                    <button type="button" onclick="closeModal('triggerCallModal')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2.5 rounded-xl transition text-xs flex items-center justify-center">
+                        إلغاء
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <!-- زر إرسال الإشعار المنفصل -->
+                        <button type="button" id="sendPushNotificationBtn" onclick="sendPushNotification()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 text-xs shadow-lg shadow-amber-500/20 active:scale-95">
+                            <i class="fa-solid fa-bell"></i> إرسال إشعار
+                        </button>
+                        <!-- زر إرسال النداء الصوتي المنفصل (الأخضر الأصلي) -->
+                        <button type="button" id="confirmCallBtn" onclick="confirmVoiceCall()" disabled class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 text-xs shadow-lg shadow-emerald-500/20 opacity-50 cursor-not-allowed active:scale-95">
+                            <i class="fa-solid fa-volume-high"></i> إرسال النداء الصوتي
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -434,6 +423,7 @@
         const firebaseConfig = {
             apiKey: "AIzaSyBlukcCerg0JmlZJIKH_MMnfHqYT16VIPI",
             authDomain: "farza-abyan.firebaseapp.com",
+            databaseURL: "https://farza-abyan-default-rtdb.firebaseio.com",
             projectId: "farza-abyan",
             storageBucket: "farza-abyan.firebasestorage.app",
             messagingSenderId: "862766729352",
@@ -499,6 +489,11 @@
 
                         if (event.data.action === 'CALL_DRIVER' && appData.currentRole === 'driver') {
                             triggerDriverScreenAlert(event.data.callInfo);
+                        }
+                    } else if (event.data && event.data.type === 'PUSH_NOTIFICATION_BROADCAST') {
+                        const n = event.data.notification;
+                        if (n) {
+                            showToastNotification(`${n.title}: ${n.body}`);
                         }
                     }
                 };
@@ -752,16 +747,23 @@
 
                 mediaRecorder.onstop = () => {
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    recordedAudioBlobUrl = URL.createObjectURL(audioBlob);
                     
-                    const previewAudio = document.getElementById('audioPreview');
-                    previewAudio.src = recordedAudioBlobUrl;
-                    document.getElementById('audioPreviewContainer').classList.remove('hidden');
-                    
-                    // تفعيل زر إرسال النداء
-                    const confirmBtn = document.getElementById('confirmCallBtn');
-                    confirmBtn.disabled = false;
-                    confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    // تحويل التسجيل الصوتي إلى Data URL Base64 للمزامنة عبر المتصفحات والشاشات
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        recordedAudioBlobUrl = reader.result;
+                        const previewAudio = document.getElementById('audioPreview');
+                        if (previewAudio) previewAudio.src = recordedAudioBlobUrl;
+                        document.getElementById('audioPreviewContainer').classList.remove('hidden');
+                        
+                        // تفعيل زر إرسال النداء الصوتي
+                        const confirmBtn = document.getElementById('confirmCallBtn');
+                        if (confirmBtn) {
+                            confirmBtn.disabled = false;
+                            confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        }
+                    };
+                    reader.readAsDataURL(audioBlob);
                 };
 
                 mediaRecorder.start();
@@ -802,7 +804,113 @@
                 saveAndSync('CALL_DRIVER', { callInfo: appData.activeCall });
                 renderAll();
                 closeModal('triggerCallModal');
+                showToastNotification(`تم إرسال النداء الصوتي للسائق ${driver.name} بنجاح! 📢`);
             }
+        }
+
+        // ==========================================
+        // 🔔 وظيفة إرسال إشعار فوري وتنبيه عبر Firebase والمتصفح
+        // ==========================================
+        function sendPushNotification() {
+            const id = document.getElementById('callDriverId').value;
+            const dest = document.getElementById('callDestination').value || 'عدن';
+            const driver = appData.drivers.find(d => d.id === id);
+
+            const driverName = driver ? driver.name : (document.getElementById('callDriverName').innerText || 'السائق');
+            const busNum = driver ? driver.busNum : (document.getElementById('callBusNum').innerText.replace('رقم الباص:', '').trim());
+
+            const title = "تنبيه فرزة أبين 🚨";
+            const body = `استدعاء للسائق ${driverName} (${busNum}) - الوجهة: ${dest}`;
+
+            // 1. إرسال إلى Firebase Realtime Database
+            if (typeof firebase !== 'undefined' && firebase.database) {
+                try {
+                    firebase.database().ref('notifications_queue').push({
+                        title: title,
+                        body: body,
+                        driverId: id,
+                        driverName: driverName,
+                        busNum: busNum,
+                        destination: dest,
+                        timestamp: Date.now()
+                    }).then(() => {
+                        console.log("تمت إضافة الإشعار إلى قائمة Firebase بنجاح");
+                    }).catch(err => {
+                        console.warn("تنبيه فايربيس (قواعد الأمان أو الاتصال):", err);
+                    });
+                } catch(e) {
+                    console.warn("خطأ اتصال Firebase Database:", e);
+                }
+            }
+
+            // 2. إرسال إلى Firebase Firestore (إذا كانت مفعلة)
+            if (typeof firebase !== 'undefined' && firebase.firestore) {
+                try {
+                    firebase.firestore().collection('notifications_queue').add({
+                        title: title,
+                        body: body,
+                        driverName: driverName,
+                        busNum: busNum,
+                        destination: dest,
+                        timestamp: Date.now()
+                    }).catch(e => {});
+                } catch(e) {}
+            }
+
+            // 3. إشعار المتصفح الأصلي (Web Notification API)
+            if ('Notification' in window) {
+                if (Notification.permission === 'granted') {
+                    try {
+                        new Notification(title, {
+                            body: body,
+                            icon: 'favicon.ico'
+                        });
+                    } catch(e) {}
+                } else if (Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(perm => {
+                        if (perm === 'granted') {
+                            try { new Notification(title, { body: body }); } catch(e){}
+                        }
+                    });
+                }
+            }
+
+            // 4. البث المباشر للشاشات عبر BroadcastChannel
+            if (syncChannel) {
+                syncChannel.postMessage({
+                    type: 'PUSH_NOTIFICATION_BROADCAST',
+                    notification: {
+                        title: title,
+                        body: body,
+                        driverName: driverName,
+                        busNum: busNum,
+                        destination: dest,
+                        timestamp: Date.now()
+                    }
+                });
+            }
+
+            // إشعار تأكيد على شاشة المستخدم
+            showToastNotification(`تم إرسال الإشعار للسائق ${driverName} بنجاح! 🔔`);
+        }
+
+        // إشعار عائم في واجهة المستخدم
+        function showToastNotification(msg) {
+            let container = document.getElementById('farzaToastContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'farzaToastContainer';
+                container.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none w-11/12 max-w-sm';
+                document.body.appendChild(container);
+            }
+            const toast = document.createElement('div');
+            toast.className = 'bg-slate-900 border border-emerald-500/60 text-emerald-300 font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs sm:text-sm animate-bounce';
+            toast.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-base"></i> <span>${escapeHtml(msg)}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition', 'duration-500');
+                setTimeout(() => toast.remove(), 500);
+            }, 3500);
         }
 
         function finishLoadingAndDepart() {
