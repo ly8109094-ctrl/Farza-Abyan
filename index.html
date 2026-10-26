@@ -11,12 +11,7 @@
     <!-- Google Cairo Font -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDKs (App, Realtime Database, Firestore, Messaging) -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
-
+    <!-- Firebase SDKs -->
     <script>
         tailwind.config = {
             theme: {
@@ -82,6 +77,8 @@
             animation: activePulse 1.8s infinite;
         }
     </style>
+    <!-- Supabase JS Client v2 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="min-h-screen flex flex-col justify-between">
 
@@ -397,21 +394,18 @@
                     </div>
                 </div>
 
-                <!-- أزرار الإجراءات: إلغاء | إرسال إشعار | إرسال النداء الصوتي -->
-                <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                    <button type="button" onclick="closeModal('triggerCallModal')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2.5 rounded-xl transition text-xs flex items-center justify-center">
+                <div class="pt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-800">
+                    <button type="button" onclick="closeModal('triggerCallModal')" class="px-4 py-2.5 rounded-xl text-slate-300 hover:bg-slate-800 text-xs font-bold transition">
                         إلغاء
                     </button>
-                    <div class="flex items-center gap-2">
-                        <!-- زر إرسال الإشعار المنفصل -->
-                        <button type="button" id="sendPushNotificationBtn" onclick="sendPushNotification()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 text-xs shadow-lg shadow-amber-500/20 active:scale-95">
-                            <i class="fa-solid fa-bell"></i> إرسال إشعار
-                        </button>
-                        <!-- زر إرسال النداء الصوتي المنفصل (الأخضر الأصلي) -->
-                        <button type="button" id="confirmCallBtn" onclick="confirmVoiceCall()" disabled class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 text-xs shadow-lg shadow-emerald-500/20 opacity-50 cursor-not-allowed active:scale-95">
-                            <i class="fa-solid fa-volume-high"></i> إرسال النداء الصوتي
-                        </button>
-                    </div>
+                    <button type="button" onclick="sendSupabaseNotification()" class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 active:scale-95 transition">
+                        <span>إرسال إشعار</span>
+                        <i class="fa-solid fa-bell"></i>
+                    </button>
+                    <button type="button" onclick="confirmVoiceCall()" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-lg shadow-emerald-600/30 active:scale-95 transition">
+                        <span>إرسال النداء الصوتي</span>
+                        <i class="fa-solid fa-volume-high"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -419,584 +413,122 @@
 
     <!-- SCRIPT LOGIC -->
     <script>
-        // Firebase Configuration & FCM Initialization
-        const firebaseConfig = {
-            apiKey: "AIzaSyBlukcCerg0JmlZJIKH_MMnfHqYT16VIPI",
-            authDomain: "farza-abyan.firebaseapp.com",
-            databaseURL: "https://farza-abyan-default-rtdb.firebaseio.com",
-            projectId: "farza-abyan",
-            storageBucket: "farza-abyan.firebasestorage.app",
-            messagingSenderId: "862766729352",
-            appId: "1:862766729352:web:ca548168c1b14ce27f773d"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const messaging = firebase.messaging();
+        // ==========================================
+        // ⚙️ إعدادات وتوصيل Supabase المباشر
+        // ==========================================
+        const SUPABASE_URL = "https://lvtrdqlvsfffcqlmjegg.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_G7Sryc69HPXNGJ_7fcgvkg_LYx9-myX";
 
-        // Request Push Notification Permission & FCM Token
-        function initFirebaseMessaging() {
-            if ('Notification' in window && 'serviceWorker' in navigator) {
-                Notification.requestPermission().then((permission) => {
-                    if (permission === 'granted') {
-                        navigator.serviceWorker.register('firebase-messaging-sw.js')
-                            .then((registration) => {
-                                return messaging.getToken({
-                                    serviceWorkerRegistration: registration,
-                                    vapidKey: 'BFd61U_dxJ4IZQJA0JcmaG3LFRzRWn8gJhlG8A1vnp_DRcbdfAeqWM1Ec8PGFwaBlESYUIOu21FwOPv8evvvAY8'
-                                });
-                            })
-                            .then((token) => {
-                                if (token) {
-                                    console.log('FCM Token acquired successfully:', token);
-                                }
-                            })
-                            .catch((err) => {
-                                console.log('Error retrieving FCM token:', err);
-                            });
+        let supabaseClient = null;
+        try {
+            if (typeof supabase !== 'undefined') {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                console.log("✅ تم الاتصال بقاعدة بيانات Supabase بنجاح");
+            }
+        } catch (err) {
+            console.error("خطأ في الاتصال بـ Supabase:", err);
+        }
+
+        // الاستماع الفوري للإشعارات عبر Realtime
+        function initSupabaseRealtime() {
+            if (!supabaseClient) return;
+            supabaseClient
+                .channel('public:notifications')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, payload => {
+                    const notif = payload.new;
+                    showInAppToast(`🔔 إشعار جديد: ${notif.title} - ${notif.body}`, 'info');
+                    playNotificationChime();
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification(notif.title, { body: notif.body });
                     }
+                })
+                .subscribe((status) => {
+                    console.log("Supabase Realtime Channel Status:", status);
                 });
-            }
         }
 
-        const STORAGE_KEY = 'abyan_farza_live_sync_db_v3';
-        const BROADCAST_CHANNEL_NAME = 'abyan_farza_channel_v3';
-        let syncChannel;
-        try { syncChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME); } catch (e) {}
+        // إرسال إشعار جديد وحفظه في Supabase
+        async function sendSupabaseNotification() {
+            const driverId = document.getElementById('callDriverId')?.value;
+            const dest = document.getElementById('callDestination')?.value || 'عام';
+            const driver = appData.drivers?.find(d => d.id === driverId);
 
-        let appData = {
-            currentRole: 'delegate',
-            activeCall: null,
-            drivers: []
-        };
+            const title = driver ? `تنبيه: السائق ${driver.name}` : "تنبيه فرزة أبين 🚨";
+            const body = driver 
+                ? `طلب تحميل مباشر لباص رقم (${driver.busNum}) إلى وجهة [${dest}]`
+                : `يوجد نداء وتنبيه جديد من إدارة الفرزة للسائقين المتجهين إلى [${dest}]`;
 
-        // متغيرات التسجيل الصوتي
-        let mediaRecorder;
-        let audioChunks = [];
-        let recordedAudioBlobUrl = null;
+            if (supabaseClient) {
+                try {
+                    const { error } = await supabaseClient
+                        .from('notifications')
+                        .insert([{
+                            title: title,
+                            body: body,
+                            driver_name: driver ? driver.name : null,
+                            bus_num: driver ? driver.busNum : null,
+                            destination: dest,
+                            created_at: new Date().toISOString()
+                        }]);
 
-        window.onload = function() {
-            loadFromStorage();
-            if (!appData.drivers || appData.drivers.length === 0) seedData();
-            
-            // تهيئة إشعارات الويب من فايربيس
-            initFirebaseMessaging();
-
-            if (syncChannel) {
-                syncChannel.onmessage = function(event) {
-                    if (event.data && event.data.type === 'SYNC_UPDATE') {
-                        appData.drivers = event.data.drivers;
-                        appData.activeCall = event.data.activeCall;
-                        renderAll();
-
-                        if (event.data.action === 'CALL_DRIVER' && appData.currentRole === 'driver') {
-                            triggerDriverScreenAlert(event.data.callInfo);
-                        }
-                    } else if (event.data && event.data.type === 'PUSH_NOTIFICATION_BROADCAST') {
-                        const n = event.data.notification;
-                        if (n) {
-                            showToastNotification(`${n.title}: ${n.body}`);
-                        }
+                    if (error) {
+                        console.error("خطأ أثناء الإرسال لـ Supabase:", error);
+                        showInAppToast("تعذر الإرسال لـ Supabase: " + error.message, "error");
+                        return;
                     }
-                };
-            }
-            renderAll();
-        };
-
-        function seedData() {
-            const now = Date.now();
-            appData.drivers = [
-                { id: '1', name: 'أحمد صالح المرقشي', busNum: '10293 / أبين', prefDest: 'عدن', status: 'WAITING', regTime: now - 3600000 * 2 },
-                { id: '2', name: 'عمار محسن العمودي', busNum: '5812 / أبين', prefDest: 'زنجبار', status: 'WAITING', regTime: now - 3600000 * 1.5 }
-            ];
-            saveAndSync('SEED');
-        }
-
-        function saveAndSync(actionName = 'UPDATE', extraPayload = {}) {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    drivers: appData.drivers,
-                    activeCall: appData.activeCall
-                }));
-            } catch(e) {}
-
-            if (syncChannel) {
-                syncChannel.postMessage({
-                    type: 'SYNC_UPDATE',
-                    action: actionName,
-                    drivers: appData.drivers,
-                    activeCall: appData.activeCall,
-                    ...extraPayload
-                });
-            }
-        }
-
-        function loadFromStorage() {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                try {
-                    const parsed = JSON.parse(saved);
-                    appData.drivers = parsed.drivers || [];
-                    appData.activeCall = parsed.activeCall || null;
-                } catch(e) {}
-            }
-        }
-
-        function switchRole(role) {
-            appData.currentRole = role;
-            const btnDel = document.getElementById('btnRoleDelegate');
-            const btnDrv = document.getElementById('btnRoleDriver');
-            const viewDel = document.getElementById('viewDelegate');
-            const viewDrv = document.getElementById('viewDriver');
-
-            if (role === 'delegate') {
-                viewDel.classList.remove('hidden');
-                viewDrv.classList.add('hidden');
-                btnDel.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-brand-600 text-white shadow-md";
-                btnDrv.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-400 hover:text-white";
-            } else {
-                viewDel.classList.add('hidden');
-                viewDrv.classList.remove('hidden');
-                btnDrv.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-amber-500 text-slate-950 shadow-md";
-                btnDel.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-400 hover:text-white";
-            }
-            renderAll();
-        }
-
-        function openDriverWindow() {
-            window.open(window.location.href, '_blank', 'width=500,height=800');
-        }
-
-        function renderAll() {
-            renderDelegateStats();
-            renderDelegateQueue();
-            renderDelegateDeparted();
-            renderActiveCallBanner();
-            renderDriverView();
-        }
-
-        function renderDelegateStats() {
-            const waiting = appData.drivers.filter(d => d.status === 'WAITING').length;
-            const departed = appData.drivers.filter(d => d.status === 'DEPARTED').length;
-            const active = appData.activeCall ? 1 : 0;
-            document.getElementById('delStatWaiting').innerText = waiting;
-            document.getElementById('delStatActive').innerText = active;
-            document.getElementById('delStatDeparted').innerText = departed;
-            document.getElementById('delStatPassengers').innerText = departed * 14;
-            document.getElementById('queueCountBadge').innerText = `${waiting} باص`;
-        }
-
-        function renderDelegateQueue() {
-            const tbody = document.getElementById('delegateQueueBody');
-            const emptyMsg = document.getElementById('emptyQueueMsg');
-            tbody.innerHTML = '';
-            const waitingList = appData.drivers.filter(d => d.status === 'WAITING');
-
-            if (waitingList.length === 0) {
-                emptyMsg.classList.remove('hidden');
-                return;
-            }
-            emptyMsg.classList.add('hidden');
-
-            waitingList.forEach((driver, idx) => {
-                const turnNum = idx + 1;
-                const isNext = (idx === 0);
-                const tr = document.createElement('tr');
-                tr.className = isNext ? 'bg-amber-500/10 font-bold border-l-4 border-amber-500' : 'hover:bg-slate-800/40';
-
-                tr.innerHTML = `
-                    <td class="p-3 text-center"><span class="w-6 h-6 rounded-lg ${isNext ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-700 text-slate-300'} inline-flex items-center justify-center text-xs">${turnNum}</span></td>
-                    <td class="p-3 font-bold text-white">${escapeHtml(driver.name)}</td>
-                    <td class="p-3"><span class="font-mono bg-slate-900 px-2 py-1 rounded text-amber-300">${escapeHtml(driver.busNum)}</span></td>
-                    <td class="p-3 text-slate-300">${escapeHtml(driver.prefDest || 'غير محدد')}</td>
-                    <td class="p-3 text-slate-400 text-[11px]">${new Date(driver.regTime).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
-                    <td class="p-3 text-center">
-                        <button onclick="moveQueue('${driver.id}', -1)" ${idx === 0 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-chevron-up"></i></button>
-                        <button onclick="moveQueue('${driver.id}', 1)" ${idx === waitingList.length - 1 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-chevron-down"></i></button>
-                    </td>
-                    <td class="p-3 text-center">
-                        <button onclick="openTriggerCallModal('${driver.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs">
-                            <i class="fa-solid fa-microphone"></i> نداء صوتي
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function moveQueue(id, direction) {
-            const waitingIndices = [];
-            appData.drivers.forEach((d, index) => { if (d.status === 'WAITING') waitingIndices.push(index); });
-            const currWaitingPos = waitingIndices.findIndex(idx => appData.drivers[idx].id === id);
-            if (currWaitingPos === -1) return;
-            const targetWaitingPos = currWaitingPos + direction;
-            if (targetWaitingPos < 0 || targetWaitingPos >= waitingIndices.length) return;
-
-            const actualCurrIdx = waitingIndices[currWaitingPos];
-            const actualTargetIdx = waitingIndices[targetWaitingPos];
-            const temp = appData.drivers[actualCurrIdx];
-            appData.drivers[actualCurrIdx] = appData.drivers[actualTargetIdx];
-            appData.drivers[actualTargetIdx] = temp;
-
-            saveAndSync('MOVE_QUEUE');
-            renderAll();
-        }
-
-        function renderActiveCallBanner() {
-            const banner = document.getElementById('activeCallBanner');
-            if (!appData.activeCall) { banner.classList.add('hidden'); return; }
-            banner.classList.remove('hidden');
-            document.getElementById('activeDriverName').innerText = appData.activeCall.driverName;
-            document.getElementById('activeBusInfo').innerText = `الباص: ${appData.activeCall.busNum}`;
-            document.getElementById('activeDestination').innerText = appData.activeCall.destination;
-            document.getElementById('activeCallTime').innerText = 'تم النداء: ' + new Date(appData.activeCall.timestamp).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
-        }
-
-        function renderDelegateDeparted() {
-            const tbody = document.getElementById('delegateDepartedBody');
-            tbody.innerHTML = '';
-            const departed = appData.drivers.filter(d => d.status === 'DEPARTED');
-            if (departed.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">لا توجد رحلات مغادرة اليوم.</td></tr>`;
-                return;
-            }
-            departed.forEach(d => {
-                tbody.innerHTML += `
-                    <tr class="hover:bg-slate-800/30">
-                        <td class="p-2 font-bold text-white">${escapeHtml(d.name)}</td>
-                        <td class="p-2 font-mono text-amber-300">${escapeHtml(d.busNum)}</td>
-                        <td class="p-2 text-slate-300 font-bold">${escapeHtml(d.destination)}</td>
-                        <td class="p-2 text-center text-emerald-400 font-bold">${d.passengers || 14}</td>
-                        <td class="p-2 text-slate-400">${new Date(d.departTime).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
-                        <td class="p-2 text-center"><button onclick="revertDeparted('${d.id}')" class="text-slate-400 hover:text-amber-400"><i class="fa-solid fa-rotate-left"></i></button></td>
-                    </tr>
-                `;
-            });
-        }
-
-        function renderDriverView() {
-            const activeContent = document.getElementById('driverActiveContent');
-            const queueCards = document.getElementById('driverQueueCards');
-
-            if (appData.activeCall) {
-                activeContent.innerHTML = `
-                    <div class="flex flex-wrap justify-between items-center gap-3 bg-slate-950/40 p-3 rounded-2xl border border-amber-400/30">
-                        <div>
-                            <h2 class="text-2xl font-black text-white">${escapeHtml(appData.activeCall.driverName)}</h2>
-                            <p class="text-xs font-mono font-bold text-slate-900 bg-amber-400 inline-block px-2 py-0.5 rounded mt-1">${escapeHtml(appData.activeCall.busNum)}</p>
-                        </div>
-                        <div class="text-left space-y-2">
-                            <span class="text-xs font-bold text-slate-900 block">الوجهة: <strong class="bg-white px-2 py-1 rounded">${escapeHtml(appData.activeCall.destination)}</strong></span>
-                            ${appData.activeCall.audioUrl ? `<audio controls src="${appData.activeCall.audioUrl}" class="h-9 w-48"></audio>` : ''}
-                        </div>
-                    </div>
-                `;
-            } else {
-                activeContent.innerHTML = `<div class="p-3 text-center text-slate-900 font-extrabold text-xs">لا يوجد نداء حالياً. تابع دورك بالطابور أدناه.</div>`;
-            }
-
-            queueCards.innerHTML = '';
-            const waitingList = appData.drivers.filter(d => d.status === 'WAITING');
-            waitingList.forEach((driver, idx) => {
-                const turnNum = idx + 1;
-                const isNext = (idx === 0);
-                queueCards.innerHTML += `
-                    <div class="p-4 rounded-2xl border ${isNext ? 'bg-gradient-to-br from-amber-500/20 to-slate-800 border-amber-500/60 shadow-lg' : 'bg-slate-800/80 border-slate-700'}">
-                        <div class="flex justify-between items-start">
-                            <div class="flex items-center gap-2.5">
-                                <span class="w-8 h-8 rounded-xl ${isNext ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-700 text-slate-300'} flex items-center justify-center text-sm">${turnNum}</span>
-                                <div>
-                                    <h4 class="font-black text-white text-sm">${escapeHtml(driver.name)}</h4>
-                                    <p class="text-xs font-mono text-amber-300 font-bold">${escapeHtml(driver.busNum)}</p>
-                                </div>
-                            </div>
-                            ${isNext ? '<span class="bg-amber-500/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">التالي بالدور</span>' : ''}
-                        </div>
-                    </div>
-                `;
-            });
-        }
-
-        // ==========================================
-        // 🎙️ وظائف التسجيل الصوتي الحقيقي للمندوب
-        // ==========================================
-        function openTriggerCallModal(driverId) {
-            const driver = appData.drivers.find(d => d.id === driverId);
-            if (!driver) return;
-            document.getElementById('callDriverId').value = driver.id;
-            document.getElementById('callDriverName').innerText = driver.name;
-            document.getElementById('callBusNum').innerText = `رقم الباص: ${driver.busNum}`;
-            document.getElementById('callDestination').value = driver.prefDest || 'عدن';
-            
-            // إعادة ضبط حالة التسجيل
-            recordedAudioBlobUrl = null;
-            document.getElementById('audioPreviewContainer').classList.add('hidden');
-            document.getElementById('confirmCallBtn').disabled = true;
-            document.getElementById('confirmCallBtn').classList.add('opacity-50', 'cursor-not-allowed');
-
-            openModal('triggerCallModal');
-        }
-
-        async function startRecording() {
-            audioChunks = [];
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    
-                    // تحويل التسجيل الصوتي إلى Data URL Base64 للمزامنة عبر المتصفحات والشاشات
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        recordedAudioBlobUrl = reader.result;
-                        const previewAudio = document.getElementById('audioPreview');
-                        if (previewAudio) previewAudio.src = recordedAudioBlobUrl;
-                        document.getElementById('audioPreviewContainer').classList.remove('hidden');
-                        
-                        // تفعيل زر إرسال النداء الصوتي
-                        const confirmBtn = document.getElementById('confirmCallBtn');
-                        if (confirmBtn) {
-                            confirmBtn.disabled = false;
-                            confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                        }
-                    };
-                    reader.readAsDataURL(audioBlob);
-                };
-
-                mediaRecorder.start();
-                document.getElementById('startRecBtn').disabled = true;
-                document.getElementById('stopRecBtn').disabled = false;
-                document.getElementById('stopRecBtn').classList.remove('opacity-50');
-                document.getElementById('recordingStatus').innerText = "🔴 جاري التسجيل الآن... تحدث بصوتك بوضوح";
-            } catch (err) {
-                alert("تعذر الوصول إلى الميكروفون. يجدر التأكد من منح الإذن للمتصفح.");
-            }
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-                document.getElementById('startRecBtn').disabled = false;
-                document.getElementById('stopRecBtn').disabled = true;
-                document.getElementById('stopRecBtn').classList.add('opacity-50');
-                document.getElementById('recordingStatus').innerText = "✅ تم الانتهاء من التسجيل. يمكنك الاستماع للصوت أدناه قبل الإرسال.";
-            }
-        }
-
-        function confirmVoiceCall() {
-            const id = document.getElementById('callDriverId').value;
-            const dest = document.getElementById('callDestination').value;
-            const driver = appData.drivers.find(d => d.id === id);
-
-            if (driver) {
-                appData.activeCall = {
-                    driverId: driver.id,
-                    driverName: driver.name,
-                    busNum: driver.busNum,
-                    destination: dest,
-                    audioUrl: recordedAudioBlobUrl, // رابط التسجيل الصوتي الحقيقي بصوتك
-                    timestamp: Date.now()
-                };
-
-                saveAndSync('CALL_DRIVER', { callInfo: appData.activeCall });
-                renderAll();
-                closeModal('triggerCallModal');
-                showToastNotification(`تم إرسال النداء الصوتي للسائق ${driver.name} بنجاح! 📢`);
-            }
-        }
-
-        // ==========================================
-        // 🔔 وظيفة إرسال إشعار فوري وتنبيه عبر Firebase والمتصفح
-        // ==========================================
-        function sendPushNotification() {
-            const id = document.getElementById('callDriverId').value;
-            const dest = document.getElementById('callDestination').value || 'عدن';
-            const driver = appData.drivers.find(d => d.id === id);
-
-            const driverName = driver ? driver.name : (document.getElementById('callDriverName').innerText || 'السائق');
-            const busNum = driver ? driver.busNum : (document.getElementById('callBusNum').innerText.replace('رقم الباص:', '').trim());
-
-            const title = "تنبيه فرزة أبين 🚨";
-            const body = `استدعاء للسائق ${driverName} (${busNum}) - الوجهة: ${dest}`;
-
-            // 1. إرسال إلى Firebase Realtime Database
-            if (typeof firebase !== 'undefined' && firebase.database) {
-                try {
-                    firebase.database().ref('notifications_queue').push({
-                        title: title,
-                        body: body,
-                        driverId: id,
-                        driverName: driverName,
-                        busNum: busNum,
-                        destination: dest,
-                        timestamp: Date.now()
-                    }).then(() => {
-                        console.log("تمت إضافة الإشعار إلى قائمة Firebase بنجاح");
-                    }).catch(err => {
-                        console.warn("تنبيه فايربيس (قواعد الأمان أو الاتصال):", err);
-                    });
-                } catch(e) {
-                    console.warn("خطأ اتصال Firebase Database:", e);
+                } catch (e) {
+                    console.error("استثناء في Supabase:", e);
                 }
             }
 
-            // 2. إرسال إلى Firebase Firestore (إذا كانت مفعلة)
-            if (typeof firebase !== 'undefined' && firebase.firestore) {
-                try {
-                    firebase.firestore().collection('notifications_queue').add({
-                        title: title,
-                        body: body,
-                        driverName: driverName,
-                        busNum: busNum,
-                        destination: dest,
-                        timestamp: Date.now()
-                    }).catch(e => {});
-                } catch(e) {}
+            if (syncChannel) {
+                syncChannel.postMessage({
+                    type: 'PUSH_NOTIFICATION',
+                    title: title,
+                    body: body,
+                    timestamp: Date.now()
+                });
             }
 
-            // 3. إشعار المتصفح الأصلي (Web Notification API)
             if ('Notification' in window) {
                 if (Notification.permission === 'granted') {
-                    try {
-                        new Notification(title, {
-                            body: body,
-                            icon: 'favicon.ico'
-                        });
-                    } catch(e) {}
+                    new Notification(title, { body: body });
                 } else if (Notification.permission !== 'denied') {
-                    Notification.requestPermission().then(perm => {
-                        if (perm === 'granted') {
-                            try { new Notification(title, { body: body }); } catch(e){}
-                        }
-                    });
+                    Notification.requestPermission();
                 }
             }
 
-            // 4. البث المباشر للشاشات عبر BroadcastChannel
-            if (syncChannel) {
-                syncChannel.postMessage({
-                    type: 'PUSH_NOTIFICATION_BROADCAST',
-                    notification: {
-                        title: title,
-                        body: body,
-                        driverName: driverName,
-                        busNum: busNum,
-                        destination: dest,
-                        timestamp: Date.now()
-                    }
-                });
-            }
-
-            // إشعار تأكيد على شاشة المستخدم
-            showToastNotification(`تم إرسال الإشعار للسائق ${driverName} بنجاح! 🔔`);
+            showInAppToast(`تم إرسال الإشعار بنجاح للسائق ${driver ? driver.name : ''}! 🔔`, 'success');
+            playNotificationChime();
         }
 
-        // إشعار عائم في واجهة المستخدم
-        function showToastNotification(msg) {
-            let container = document.getElementById('farzaToastContainer');
-            if (!container) {
-                container = document.createElement('div');
-                container.id = 'farzaToastContainer';
-                container.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none w-11/12 max-w-sm';
-                document.body.appendChild(container);
-            }
+        function playNotificationChime() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.35);
+            } catch(e) {}
+        }
+
+        function showInAppToast(msg, type = 'success') {
             const toast = document.createElement('div');
-            toast.className = 'bg-slate-900 border border-emerald-500/60 text-emerald-300 font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs sm:text-sm animate-bounce';
-            toast.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-base"></i> <span>${escapeHtml(msg)}</span>`;
-            container.appendChild(toast);
+            const bg = type === 'error' ? 'bg-rose-600 text-white' : (type === 'info' ? 'bg-amber-500 text-slate-950 font-black' : 'bg-emerald-600 text-white font-bold');
+            toast.className = `fixed top-5 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-2xl ${bg} text-sm shadow-2xl flex items-center gap-3 transition-all duration-300`;
+            toast.innerHTML = `<span>${msg}</span>`;
+            document.body.appendChild(toast);
             setTimeout(() => {
-                toast.classList.add('opacity-0', 'transition', 'duration-500');
-                setTimeout(() => toast.remove(), 500);
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
             }, 3500);
         }
 
-        function finishLoadingAndDepart() {
-            if (!appData.activeCall) return;
-            const driver = appData.drivers.find(d => d.id === appData.activeCall.driverId);
-            if (driver) {
-                driver.status = 'DEPARTED';
-                driver.destination = appData.activeCall.destination;
-                driver.passengers = 14;
-                driver.departTime = Date.now();
-            }
-            appData.activeCall = null;
-            saveAndSync('DEPART_FINISH');
-            renderAll();
-        }
-
-        function revertDeparted(id) {
-            const driver = appData.drivers.find(d => d.id === id);
-            if (driver) {
-                driver.status = 'WAITING';
-                delete driver.destination; delete driver.passengers; delete driver.departTime;
-                saveAndSync('REVERT_DEPARTED');
-                renderAll();
-            }
-        }
-
-        function resetDayData() {
-            if (confirm('تصفير سجلات اليوم بالكامل؟')) {
-                appData.drivers = [];
-                appData.activeCall = null;
-                saveAndSync('RESET_DAY');
-                renderAll();
-            }
-        }
-
-        function handleAddBus(e) {
-            e.preventDefault();
-            const name = document.getElementById('inputDriverName').value.trim();
-            const busNum = document.getElementById('inputBusNum').value.trim();
-            const prefDest = document.getElementById('inputPreferredDest').value;
-            if (!name || !busNum) return;
-
-            appData.drivers.push({
-                id: Date.now().toString(),
-                name, busNum, prefDest,
-                status: 'WAITING',
-                regTime: Date.now()
-            });
-            saveAndSync('ADD_BUS');
-            renderAll();
-            closeModal('addBusModal');
-            document.getElementById('inputDriverName').value = '';
-            document.getElementById('inputBusNum').value = '';
-        }
-
-        function triggerDriverScreenAlert(callInfo) {
-            if (!callInfo) return;
-            document.getElementById('alertDriverName').innerText = callInfo.driverName;
-            document.getElementById('alertBusInfo').innerText = `الباص: ${callInfo.busNum}`;
-            document.getElementById('alertDestination').innerText = callInfo.destination;
-            
-            const audioPlayer = document.getElementById('alertAudioPlayer');
-            const audioContainer = document.getElementById('alertAudioContainer');
-            if (callInfo.audioUrl) {
-                audioPlayer.src = callInfo.audioUrl;
-                audioContainer.classList.remove('hidden');
-                audioPlayer.play().catch(e => console.log("Auto-play blocked"));
-            } else {
-                audioContainer.classList.add('hidden');
-            }
-
-            document.getElementById('driverCallAlert').classList.remove('hidden');
-        }
-
-        function dismissAlert() {
-            document.getElementById('driverCallAlert').classList.add('hidden');
-            const audioPlayer = document.getElementById('alertAudioPlayer');
-            audioPlayer.pause();
-        }
-
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-        }
-    </script>
-</body>
-</html>
+        
