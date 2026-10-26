@@ -408,6 +408,19 @@
         إرسال إشعار
       </button>
     </div>
+// دالة إرسال الإشعار عند الضغط على زر "إرسال إشعار"
+function sendPushNotification() {
+  // إرسال بيانات الإشعار إلى Firebase Realtime Database
+  firebase.database().ref('notifications_queue').push({
+    title: "تنبيه فرزة أبين 🚨",
+    body: "يوجد نداء وتنبيه جديد من إدارة الفرزة للسائقين",
+    timestamp: Date.now()
+  }).then(() => {
+    alert("تم إرسال الإشعار لجميع السائقين بنجاح! 🔔");
+  }).catch((error) => {
+    console.error("خطأ أثناء إرسال الإشعار: ", error);
+  });
+}
 
                     
                 </div>
