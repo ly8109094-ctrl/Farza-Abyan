@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>فرزة أبين - نظام إدارة الفرزة والنداء الصوتي الحي</title>
+    <title>فرزة أبين - نظام الإدارة والرقابة والنداء الصوتي الحي</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -70,12 +70,12 @@
             50% { background-color: #b91c1c; border-color: #ffffff; transform: scale(1.02); }
         }
         .animate-alert-flash {
-            animation: alertFlash 0.8s infinite ease-in-out;
+            animation: alertFlash 1.2s infinite;
         }
 
         @keyframes activePulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
-            50% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(0.99); }
         }
         .pulse-call {
             animation: activePulse 1.8s infinite;
@@ -84,7 +84,86 @@
 </head>
 <body class="min-h-screen flex flex-col justify-between">
 
-    <!-- TOP CONTROL BAR -->
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toastContainer" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-md px-4"></div>
+
+    <!-- LOGIN SCREEN (INITIAL INTERFACE) -->
+    <div id="viewLogin" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+            
+            <div class="text-center space-y-2">
+                <div class="w-16 h-16 bg-gradient-to-tr from-amber-500 to-amber-300 rounded-2xl flex items-center justify-center mx-auto text-slate-950 text-3xl shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-van-shuttle"></i>
+                </div>
+                <h1 class="text-2xl font-black text-white">نظام فرزة أبين الموحد</h1>
+                <p class="text-xs text-slate-400">بوابة تسجيل الدخول وتحديد الصلاحيات ونظام النداء الحي</p>
+            </div>
+
+            <!-- PRIMARY PATH SELECTION -->
+            <div class="space-y-3">
+                <label class="block text-xs font-bold text-slate-300">اختر صفة الدخول:</label>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- ADMIN BUTTON -->
+                    <button type="button" id="loginPathAdminBtn" onclick="selectLoginPath('admin')" class="p-4 rounded-2xl border-2 border-slate-700 bg-slate-800/80 hover:border-amber-500 transition text-center space-y-2 group">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 mx-auto flex items-center justify-center text-lg transition">
+                            <i class="fa-solid fa-user-shield"></i>
+                        </div>
+                        <div class="font-extrabold text-sm text-white">الإدارة</div>
+                        <p class="text-[10px] text-slate-400">النقابة والمناديب</p>
+                    </button>
+
+                    <!-- BUS DRIVER BUTTON -->
+                    <button type="button" id="loginPathDriverBtn" onclick="selectLoginPath('driver')" class="p-4 rounded-2xl border-2 border-slate-700 bg-slate-800/80 hover:border-brand-500 transition text-center space-y-2 group">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-400 group-hover:bg-brand-500 group-hover:text-white mx-auto flex items-center justify-center text-lg transition">
+                            <i class="fa-solid fa-id-card"></i>
+                        </div>
+                        <div class="font-extrabold text-sm text-white">سائق باص</div>
+                        <p class="text-[10px] text-slate-400">متابعة الطابور والنداء</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ADMIN ROLE DROPDOWN & FORM -->
+            <div id="adminLoginForm" class="hidden space-y-4 pt-2 border-t border-slate-800">
+                <div>
+                    <label class="block text-xs font-extrabold text-slate-300 mb-1.5">
+                        <i class="fa-solid fa-sitemap text-amber-400 ml-1"></i> الرتبة الإدارية:
+                    </label>
+                    <select id="adminRoleSelect" class="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:border-amber-500">
+                        <option value="president">رئيس النقابة (Union President) - رقابة شاملة قراءة فقط</option>
+                        <option value="delegate_terminal">مندوب الفرزة (Terminal Delegate) - فرزة المحطة</option>
+                        <option value="delegate_roundabout">مندوب الجولة (Roundabout Delegate) - فرزة الجولة</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">رمز الدخول السريع (PIN / Password):</label>
+                    <input type="password" id="adminPinInput" value="1234" placeholder="أدخل الرمز (الافتراضي: 1234)" class="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-amber-500 font-mono">
+                    <p class="text-[10px] text-slate-400 mt-1">الرمز الافتراضي للتجربة: 1234</p>
+                </div>
+
+                <button type="button" onclick="executeAdminLogin()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black py-3 rounded-xl text-xs shadow-lg transition">
+                    تسجيل الدخول للمنظومة الإدارية
+                </button>
+            </div>
+
+            <!-- DRIVER LOGIN FORM -->
+            <div id="driverLoginForm" class="hidden space-y-4 pt-2 border-t border-slate-800">
+                <div>
+                    <label class="block text-xs font-extrabold text-slate-300 mb-1">اسم السائق أو رقم الباص (اختياري):</label>
+                    <input type="text" id="driverLoginInput" placeholder="مثال: أحمد صالح أو 10293" class="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-brand-500">
+                </div>
+
+                <button type="button" onclick="executeDriverLogin()" class="w-full bg-brand-600 hover:bg-brand-500 text-white font-black py-3 rounded-xl text-xs shadow-lg transition">
+                    الدخول إلى شاشة السائقين والنداء المباشر
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- TOP CONTROL BAR (ACTIVE SESSION) -->
     <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl">
         <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
             <div class="flex items-center space-x-3 space-x-reverse">
@@ -93,21 +172,25 @@
                 </div>
                 <div>
                     <h1 class="font-black text-lg leading-none text-white">فرزة أبين - الهايص</h1>
-                    <p class="text-xs text-amber-400 font-semibold mt-1">نظام المزامنة والنداء الصوتي الحي</p>
+                    <p class="text-xs text-amber-400 font-semibold mt-1" id="headerSubtitle">نظام المزامنة والرقابة والنداء الحي</p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-1.5 bg-slate-800 p-1.5 rounded-2xl border border-slate-700/80">
-                <button id="btnRoleDelegate" onclick="switchRole('delegate')" class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition duration-200 flex items-center gap-1.5 bg-brand-600 text-white shadow-md">
-                    <i class="fa-solid fa-user-gear"></i>
-                    <span>واجهة المندوب</span>
-                </button>
-                <button id="btnRoleDriver" onclick="switchRole('driver')" class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition duration-200 flex items-center gap-1.5 text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-mobile-screen-button"></i>
-                    <span>شاشة السائقين</span>
-                </button>
-                <button onclick="openDriverWindow()" title="فتح شاشة السائقين في نافذة مستقلة للربط بين جهازين" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-2 rounded-xl text-xs transition">
+            <!-- USER STATUS & ROLE BADGE -->
+            <div class="flex items-center gap-2">
+                <div id="sessionRoleBadge" class="bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 text-slate-200">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- DRIVER POPUP WINDOW BUTTON (FOR MULTI-SCREEN) -->
+                <button onclick="openDriverWindow()" title="فتح شاشة السائقين في نافذة مستقلة للربط بين جهازين" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-xl text-xs transition border border-slate-700">
                     <i class="fa-solid fa-up-right-from-square"></i>
+                </button>
+
+                <!-- LOGOUT BUTTON -->
+                <button onclick="logoutSession()" title="تسجيل الخروج والعودة لبوابة الدخول" class="bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-400 p-2 rounded-xl text-xs transition border border-rose-500/30 flex items-center gap-1.5 font-bold">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span class="hidden sm:inline">خروج</span>
                 </button>
             </div>
         </div>
@@ -144,8 +227,116 @@
             </div>
         </div>
 
-        <!-- 1. DELEGATE VIEW -->
+        <!-- 1. UNION PRESIDENT GOVERNANCE VIEW (READ-ONLY) -->
+        <div id="viewPresident" class="space-y-5 hidden">
+            <!-- SECURITY NOTICE BANNER -->
+            <div class="bg-purple-950/60 border-2 border-purple-500/80 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-lg">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center text-2xl">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-sm text-white">نظام الرقابة العامة لرئيس النقابة</h3>
+                        <p class="text-xs text-purple-300 mt-0.5">وضع الاطلاع المباشر الشامل (قراءة فقط - جميع صلاحيات التعديل والإضافة والحذف مقيدة أمنياً)</p>
+                    </div>
+                </div>
+                <span class="bg-purple-500 text-slate-950 font-black text-xs px-3 py-1 rounded-full uppercase">READ-ONLY</span>
+            </div>
+
+            <!-- AGGREGATE SUMMARY STATS -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">باصات المحطة (انتظار)</p>
+                        <h3 id="presStatTerminalWaiting" class="text-2xl font-black text-amber-400">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-building"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">باصات الجولة (انتظار)</p>
+                        <h3 id="presStatRoundaboutWaiting" class="text-2xl font-black text-emerald-400">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-route"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">إجمالي رحلات اليوم</p>
+                        <h3 id="presStatTotalDeparted" class="text-2xl font-black text-brand-400">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-van-shuttle"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">إجمالي الركاب المنقولين</p>
+                        <h3 id="presStatTotalPassengers" class="text-2xl font-black text-purple-400">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DELEGATE REGISTRY SELECTOR FOR PRESIDENT -->
+            <div class="bg-slate-800/90 p-4 rounded-2xl border border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-300">عرض سجل المندوب للرقابة:</span>
+                    <div class="flex gap-1.5">
+                        <button type="button" id="presTabTerminal" onclick="switchPresidentViewDelegate('terminal')" class="px-4 py-2 rounded-xl text-xs font-black transition bg-brand-600 text-white shadow-md flex items-center gap-1.5">
+                            <i class="fa-solid fa-building"></i> مندوب الفرزة (المحطة)
+                        </button>
+                        <button type="button" id="presTabRoundabout" onclick="switchPresidentViewDelegate('roundabout')" class="px-4 py-2 rounded-xl text-xs font-black transition text-slate-400 hover:text-white bg-slate-900 border border-slate-700 flex items-center gap-1.5">
+                            <i class="fa-solid fa-route"></i> مندوب الجولة
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>مزامنة رقابية نشطة</span>
+                </div>
+            </div>
+
+            <!-- PRESIDENT INSPECTION WORKSPACE -->
+            <div id="presidentInspectWorkspace" class="space-y-4">
+                <!-- Reuses the Delegate table and queue in read-only mode -->
+            </div>
+        </div>
+
+        <!-- 2. DELEGATE VIEW (FOR TERMINAL OR ROUNDABOUT DELEGATE) -->
         <div id="viewDelegate" class="space-y-5">
+            <!-- CURRENT WORKSPACE BANNER -->
+            <div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center gap-3">
+                    <div id="delegateWorkspaceIcon" class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl">
+                        <i class="fa-solid fa-building"></i>
+                    </div>
+                    <div>
+                        <h2 id="delegateWorkspaceTitle" class="text-base font-black text-white">سجل فرزة أبين - المحطة الرئيسية</h2>
+                        <p id="delegateWorkspaceSubtitle" class="text-xs text-amber-400 font-semibold">صلاحيات كاملة لإدارة الطابور والتسجيل والنداء الصوتي المباشر</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button id="btnOpenAddBus" onclick="openModal('addBusModal')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition shadow-lg">
+                        <i class="fa-solid fa-plus text-sm"></i>
+                        <span>تسجيل باص جديد</span>
+                    </button>
+                    <button id="btnResetDay" onclick="resetDayData()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold px-3 py-2 rounded-xl text-xs transition">
+                        <i class="fa-solid fa-rotate-right ml-1"></i> تصفير اليوم
+                    </button>
+                </div>
+            </div>
+
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 flex justify-between items-center">
                     <div>
@@ -185,22 +376,6 @@
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
-                <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span class="text-xs font-bold text-slate-300">المزامنة المباشرة شغال</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="openModal('addBusModal')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition shadow-lg">
-                        <i class="fa-solid fa-plus text-sm"></i>
-                        <span>تسجيل باص جديد</span>
-                    </button>
-                    <button onclick="resetDayData()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold px-3 py-2 rounded-xl text-xs transition">
-                        <i class="fa-solid fa-rotate-right ml-1"></i> تصفير اليوم
-                    </button>
-                </div>
-            </div>
-
             <!-- ACTIVE LOADING BANNER -->
             <div id="activeCallBanner" class="hidden bg-gradient-to-r from-emerald-950 to-slate-900 border-2 border-emerald-500/80 p-4 rounded-3xl shadow-xl pulse-call space-y-3">
                 <div class="flex justify-between items-center border-b border-emerald-800/50 pb-2">
@@ -217,7 +392,7 @@
                         <p id="activeDestination" class="text-base font-extrabold text-amber-400">--</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button onclick="finishLoadingAndDepart()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition shadow-lg">
+                        <button id="btnFinishDepart" onclick="finishLoadingAndDepart()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition shadow-lg">
                             <i class="fa-solid fa-circle-check"></i> اكتمل التحميل والمغادرة
                         </button>
                     </div>
@@ -228,7 +403,7 @@
             <div class="bg-slate-800/90 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
                 <div class="p-4 bg-slate-900/80 border-b border-slate-700 flex justify-between items-center">
                     <h2 class="font-extrabold text-sm text-slate-200 flex items-center gap-2">
-                        <i class="fa-solid fa-list-ol text-amber-400"></i> طابور الانتظار الجاري للفرزة
+                        <i class="fa-solid fa-list-ol text-amber-400"></i> طابور الانتظار الجاري
                     </h2>
                     <span id="queueCountBadge" class="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs px-2.5 py-1 rounded-xl font-extrabold">0 باص</span>
                 </div>
@@ -276,7 +451,7 @@
                 </div>
             </div>
 
-            <!-- قسم تخصيص نغمة الإشعار والنداء (خاص بالإدارة / المندوب) -->
+            <!-- قسم تخصيص نغمة الإشعار والنداء -->
             <div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/80 space-y-3">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
@@ -294,7 +469,6 @@
                     <div>
                         <label class="block text-xs font-semibold text-slate-300 mb-1.5">اختر النغمة:</label>
                         <select id="settingChimeSelect" onchange="onSelectChimeChanged(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
-                            <!-- Options generated dynamically -->
                         </select>
                     </div>
                     <div class="flex items-end gap-2">
@@ -315,12 +489,27 @@
 
         </div>
 
-        <!-- 2. DRIVER VIEW -->
+        <!-- 3. DRIVER VIEW -->
         <div id="viewDriver" class="space-y-5 hidden">
+            <!-- STATION SELECTOR FOR DRIVER -->
+            <div class="bg-slate-800/80 p-3 rounded-2xl border border-slate-700 flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-300">موقع الفرزة التابع لها:</span>
+                    <select id="driverStationSelect" onchange="onDriverStationChanged(this.value)" class="bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-brand-500">
+                        <option value="terminal">🏢 فرزة أبين - المحطة الرئيسية</option>
+                        <option value="roundabout">🔄 فرزة الجولة</option>
+                    </select>
+                </div>
+                <div class="text-xs text-amber-400 font-bold flex items-center gap-1.5">
+                    <i class="fa-solid fa-satellite-dish animate-pulse"></i>
+                    <span>بث واستقبال النداء الصوتي مفعل</span>
+                </div>
+            </div>
+
             <div class="bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 p-5 rounded-3xl shadow-2xl border-2 border-amber-300 space-y-3">
                 <div class="flex justify-between items-center">
                     <span class="bg-slate-950 text-amber-400 font-black text-[11px] px-3 py-1 rounded-full uppercase">صاحب الدور المطلوب للتحميل الآن</span>
-                    <span class="text-xs font-bold text-slate-900 font-mono">مباشر الفرزة</span>
+                    <span class="text-xs font-bold text-slate-900 font-mono" id="driverActiveStationLabel">مباشر الفرزة</span>
                 </div>
                 <div id="driverActiveContent" class="space-y-2"></div>
             </div>
@@ -348,7 +537,7 @@
     <footer class="bg-slate-900 border-t border-slate-800 py-3 mt-auto">
         <div class="max-w-5xl mx-auto px-4 text-center text-[11px] text-slate-500 flex justify-between items-center">
             <div>نظام فرزة باصات الهايص - محافظة أبين &copy; 2026</div>
-            <div class="text-slate-400"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block ml-1"></span> مزامنة حية مفعلة</div>
+            <div class="text-slate-400"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block ml-1"></span> حماية وعزل بيانات وصلاحيات RBAC مفعلة</div>
         </div>
     </footer>
 
@@ -385,12 +574,12 @@
         </div>
     </div>
 
-    <!-- MODAL: TRIGGER VOICE CALL RECORDING (نداء صوتي بصوت المندوب) -->
+    <!-- MODAL: TRIGGER VOICE CALL RECORDING -->
     <div id="triggerCallModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
                 <h3 class="font-extrabold text-sm text-slate-100 flex items-center gap-2">
-                    <i class="fa-solid fa-microphone text-emerald-400"></i> تسجيل نداء صوتي بصوتك للسائق
+                    <i class="fa-solid fa-microphone text-emerald-400"></i> تسجيل نداء صوتي بصوت المندوب للسائق
                 </h3>
                 <button onclick="closeModal('triggerCallModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
@@ -451,470 +640,514 @@
         </div>
     </div>
 
-    <!-- SCRIPT LOGIC -->
+    <!-- MAIN JAVASCRIPT APPLICATION LOGIC -->
     <script>
-        // Firebase Configuration & FCM Initialization
-        const firebaseConfig = {
-            apiKey: "AIzaSyBlukcCerg0JmlZJIKH_MMnfHqYT16VIPI",
-            authDomain: "farza-abyan.firebaseapp.com",
-            projectId: "farza-abyan",
-            storageBucket: "farza-abyan.firebasestorage.app",
-            messagingSenderId: "862766729352",
-            appId: "1:862766729352:web:ca548168c1b14ce27f773d"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const messaging = firebase.messaging();
-
-        // Request Push Notification Permission & FCM Token
-        function initFirebaseMessaging() {
-            if ('Notification' in window && 'serviceWorker' in navigator) {
-                Notification.requestPermission().then((permission) => {
-                    if (permission === 'granted') {
-                        navigator.serviceWorker.register('firebase-messaging-sw.js')
-                            .then((registration) => {
-                                return messaging.getToken({
-                                    serviceWorkerRegistration: registration,
-                                    vapidKey: 'BFd61U_dxJ4IZQJA0JcmaG3LFRzRWn8gJhlG8A1vnp_DRcbdfAeqWM1Ec8PGFwaBlESYUIOu21FwOPv8evvvAY8'
-                                });
-                            })
-                            .then((token) => {
-                                if (token) {
-                                    console.log('FCM Token acquired successfully:', token);
-                                }
-                            })
-                            .catch((err) => {
-                                console.log('Error retrieving FCM token:', err);
-                            });
-                    }
-                });
-            }
-        }
-
-        
         // ==========================================
-        // تكامل Supabase Realtime للإشعارات
+        // 🔒 RBAC & DATA ISOLATION ARCHITECTURE
         // ==========================================
-        const SUPABASE_URL = "https://lvtrdqlvsfffcqlmjegg.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_G7Sryc69HPXNGJ_7fcgvkg_LYx9-myX";
-        let supabaseClient = null;
+        const STORAGE_KEY_TERMINAL = 'abyan_registry_terminal_v4';
+        const STORAGE_KEY_ROUNDABOUT = 'abyan_registry_roundabout_v4';
+        const STORAGE_KEY_SESSION = 'abyan_user_session_v4';
+        const BROADCAST_CHANNEL_NAME = 'abyan_farza_channel_v4';
 
-        try {
-            if (window.supabase) {
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                console.log("Supabase Client initialized successfully!");
-            }
-        } catch (e) {
-            console.error("Supabase init error:", e);
-        }
-
-        function initSupabaseRealtime() {
-            if (!supabaseClient) return;
-            try {
-                supabaseClient
-                    .channel('public:notifications')
-                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, payload => {
-                        const notif = payload.new;
-                        playNotificationChime();
-                        showInAppToast(`📢 ${notif.title}: ${notif.body}`);
-                        if ("Notification" in window && Notification.permission === "granted") {
-                            new Notification(notif.title, { body: notif.body });
-                        }
-                    })
-                    .subscribe();
-            } catch (err) {
-                console.error("Supabase Realtime subscription error:", err);
-            }
-        }
-
-        
-        // ==========================================
-        // NOTIFICATION CHIMES (نغمات الإشعار والتنبيه المتوافقة)
-        // ==========================================
-        const CHIME_KEY = 'farza_selected_chime_key';
-        const CUSTOM_AUDIO_KEY = 'farza_custom_audio_base64';
-        const CUSTOM_NAME_KEY = 'farza_custom_audio_name';
-
-        // قائمة نغمات محاكاة نغمات الهواتف الأصلية (Talitha, Thallium, Tinkerbell, Yahoo وغيرها)
-        const PRESET_CHIMES = {
-            talitha: {
-                label: 'Talitha (نغمة هاتف)',
-                play: (ctx) => {
-                    const notes = [
-                        { f: 659.25, t: 0, d: 0.12, type: 'sine' },      // E5
-                        { f: 880.00, t: 0.14, d: 0.14, type: 'sine' },     // A5
-                        { f: 1318.51, t: 0.30, d: 0.45, type: 'sine' }    // E6
-                    ];
-                    playNoteSequence(ctx, notes);
-                }
-            },
-            thallium: {
-                label: 'Thallium (نغمة هاتف)',
-                play: (ctx) => {
-                    const notes = [
-                        { f: 523.25, t: 0, d: 0.15, type: 'triangle' },   // C5
-                        { f: 783.99, t: 0.16, d: 0.18, type: 'triangle' },  // G5
-                        { f: 1046.50, t: 0.35, d: 0.40, type: 'sine' }    // C6
-                    ];
-                    playNoteSequence(ctx, notes);
-                }
-            },
-            tinkerbell: {
-                label: 'Tinkerbell (جرس ساحر)',
-                play: (ctx) => {
-                    const notes = [
-                        { f: 1200, t: 0, d: 0.08, type: 'triangle' },
-                        { f: 1500, t: 0.09, d: 0.08, type: 'triangle' },
-                        { f: 1800, t: 0.18, d: 0.10, type: 'sine' },
-                        { f: 2200, t: 0.28, d: 0.50, type: 'sine' }
-                    ];
-                    playNoteSequence(ctx, notes);
-                }
-            },
-            tweeters: {
-                label: 'Tweeters (عصفور سريع)',
-                play: (ctx) => {
-                    const notes = [
-                        { f: 1760, t: 0, d: 0.08, type: 'sine' },
-                        { f: 2093, t: 0.09, d: 0.08, type: 'sine' },
-                        { f: 1760, t: 0.20, d: 0.08, type: 'sine' },
-                        { f: 2349, t: 0.29, d: 0.25, type: 'sine' }
-                    ];
-                    playNoteSequence(ctx, notes);
-                }
-            },
-            yahoo: {
-                label: 'Yahoo Chime (يااهو كلاسيك)',
-                play: (ctx) => {
-                    const notes = [
-                        { f: 440, t: 0, d: 0.22, type: 'sine' },        // Ya-
-                        { f: 659.25, t: 0.24, d: 0.50, type: 'sine' }   // -hoo!
-                    ];
-                    playNoteSequence(ctx, notes);
-                }
-            },
-            voila: {
-                label: 'Voila (فويلا مبهجة)',
-                play: (ctx) => {
-                    const notes = [
-                        { f: 587.33, t: 0, d: 0.12, type: 'sine' },
-                        { f: 880.00, t: 0.13, d: 0.15, type: 'sine' },
-                        { f: 1174.66, t: 0.28, d: 0.40, type: 'sine' }
-                    ];
-                    playNoteSequence(ctx, notes);
-                }
-            },
-            station: {
-                label: 'نغمة المحطة وفرزة الهايص',
-                play: (ctx) => {
-                    const notes = [
-                        { f: 698.46, t: 0, d: 0.35, type: 'sine' },
-                        { f: 1046.50, t: 0.25, d: 0.55, type: 'sine' }
-                    ];
-                    playNoteSequence(ctx, notes);
-                }
-            }
-        };
-
-        function playNoteSequence(ctx, notes) {
-            notes.forEach(n => {
-                try {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = n.type || 'sine';
-                    osc.frequency.setValueAtTime(n.f, ctx.currentTime + n.t);
-                    gain.gain.setValueAtTime(0.25, ctx.currentTime + n.t);
-                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.t + n.d);
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(ctx.currentTime + n.t);
-                    osc.stop(ctx.currentTime + n.t + n.d);
-                } catch(e) {}
-            });
-        }
-
-        // تشغيل النغمة الحالية (سواء كانت صوت مخصص من الهاتف أو نغمة مبرمجة)
-        function playNotificationChime() {
-            try {
-                const customAudio = localStorage.getItem(CUSTOM_AUDIO_KEY);
-                const selectedKey = localStorage.getItem(CHIME_KEY) || 'talitha';
-
-                if (selectedKey === 'custom' && customAudio) {
-                    const audio = new Audio(customAudio);
-                    audio.play().catch(e => {
-                        console.log('Audio autoplay prevented, using WebAudio fallback');
-                        playPresetChime('talitha');
-                    });
-                    return;
-                }
-
-                playPresetChime(selectedKey);
-            } catch(e) {
-                console.error('Error playing notification chime:', e);
-            }
-        }
-
-        function playPresetChime(key) {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                if (ctx.state === 'suspended') {
-                    ctx.resume();
-                }
-                const chime = PRESET_CHIMES[key] || PRESET_CHIMES.talitha;
-                chime.play(ctx);
-            } catch(e) {
-                console.error('AudioContext error:', e);
-            }
-        }
-
-        function initChimeSelectUI() {
-            const select = document.getElementById('settingChimeSelect');
-            if (!select) return;
-
-            select.innerHTML = '';
-            const selectedKey = localStorage.getItem(CHIME_KEY) || 'talitha';
-            const customName = localStorage.getItem(CUSTOM_NAME_KEY);
-
-            Object.keys(PRESET_CHIMES).forEach(key => {
-                const opt = document.createElement('option');
-                opt.value = key;
-                opt.textContent = PRESET_CHIMES[key].label;
-                if (key === selectedKey) opt.selected = true;
-                select.appendChild(opt);
-            });
-
-            if (customName) {
-                const opt = document.createElement('option');
-                opt.value = 'custom';
-                opt.textContent = '🎵 ملف من الهاتف: ' + customName;
-                if (selectedKey === 'custom') opt.selected = true;
-                select.appendChild(opt);
-            }
-        }
-
-        function onSelectChimeChanged(value) {
-            localStorage.setItem(CHIME_KEY, value);
-            previewCurrentSelectedChime();
-            showInAppToast('تم اعتماد نغمة: ' + (value === 'custom' ? 'ملف من الهاتف' : (PRESET_CHIMES[value]?.label || value)), 'success');
-        }
-
-        function previewCurrentSelectedChime() {
-            playNotificationChime();
-        }
-
-        // تمكين الأدمن / المندوب من رفع أي نغمة صوتية من جهازه (mp3, wav, ogg)
-        function handleCustomChimeUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            if (file.size > 2 * 1024 * 1024) {
-                alert('حجم الملف كبير، يرجى اختيار مقطع إشعار قصير (أقل من 2 ميجابايت)');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const base64Audio = e.target.result;
-                localStorage.setItem(CUSTOM_AUDIO_KEY, base64Audio);
-                localStorage.setItem(CUSTOM_NAME_KEY, file.name);
-                localStorage.setItem(CHIME_KEY, 'custom');
-                initChimeSelectUI();
-
-                const statusEl = document.getElementById('customChimeStatusMsg');
-                const textEl = document.getElementById('customChimeStatusText');
-                if (statusEl && textEl) {
-                    textEl.textContent = 'تم حفظ النغمة بنجاح: ' + file.name;
-                    statusEl.classList.remove('hidden');
-                }
-
-                playNotificationChime();
-                showInAppToast('تم تعيين نغمة مخصصة من الهاتف بنجاح!', 'success');
-            };
-            reader.readAsDataURL(file);
-        }
-
-
-        function showInAppToast(msg, isSuccess = true) {
-            const toast = document.createElement('div');
-            toast.className = `fixed top-5 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-xl text-xs font-bold shadow-2xl flex items-center gap-2 border transition-all duration-300 ${isSuccess ? 'bg-emerald-900/90 text-emerald-200 border-emerald-500/50' : 'bg-red-900/90 text-red-200 border-red-500/50'}`;
-            toast.innerHTML = `<i class="fa-solid ${isSuccess ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-red-400'}"></i> <span>${msg}</span>`;
-            document.body.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
-        }
-
-        async function sendSupabaseNotification() {
-            const driverName = document.getElementById('callDriverName')?.innerText || 'السائق';
-            const busNum = document.getElementById('callBusNum')?.innerText || '';
-            const destination = document.getElementById('callDestination')?.value || 'الفرزة';
-
-            const notifData = {
-                title: `تنبيه دور السائق: ${driverName}`,
-                body: `باص رقم (${busNum}) - الوجهة: ${destination}. يرجى التوجه للفرزة فوراً.`,
-                driver_name: driverName,
-                bus_num: busNum,
-                destination: destination
-            };
-
-            let inserted = false;
-            if (supabaseClient) {
-                try {
-                    const { data, error } = await supabaseClient.from('notifications').insert([notifData]);
-                    if (error) {
-                        console.error('فشل إدخال الإشعار في Supabase:', error);
-                    } else {
-                        inserted = true;
-                    }
-                } catch (e) {
-                    console.error('خطأ Supabase:', e);
-                }
-            }
-
-            if (syncChannel) {
-                syncChannel.postMessage({
-                    type: 'NEW_NOTIFICATION',
-                    data: notifData,
-                    timestamp: new Date().toISOString()
-                });
-            }
-
-            if ("Notification" in window && Notification.permission === "granted") {
-                new Notification(notifData.title, { body: notifData.body });
-            }
-
-            showInAppToast(inserted ? `تم إرسال الإشعار إلى السائق ${driverName} بنجاح` : `تم بث التنبيه للسائق ${driverName}`);
-            closeModal('triggerCallModal');
-        }
-
-        const STORAGE_KEY = 'abyan_farza_live_sync_db_v3';
-        const BROADCAST_CHANNEL_NAME = 'abyan_farza_channel_v3';
         let syncChannel;
         try { syncChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME); } catch (e) {}
 
-        let appData = {
-            currentRole: 'delegate',
-            activeCall: null,
-            drivers: []
+        // Global State
+        let currentUser = null; // { role: 'president' | 'delegate_terminal' | 'delegate_roundabout' | 'driver', name: '' }
+        let currentPresidentInspectTarget = 'terminal'; // 'terminal' | 'roundabout'
+        let currentDriverStation = 'terminal';
+
+        // Isolated Registries
+        let registries = {
+            terminal: { drivers: [], activeCall: null },
+            roundabout: { drivers: [], activeCall: null }
         };
 
-        // متغيرات التسجيل الصوتي
+        // Audio & Chime Variables
         let mediaRecorder;
         let audioChunks = [];
         let recordedAudioBlobUrl = null;
+        let audioCtx = null;
+        let customChimeBase64 = null;
+        const CHIME_STORAGE_KEY = 'abyan_custom_chime_data';
+        const CHIME_CHOICE_KEY = 'abyan_selected_chime_type';
 
+        const PRESET_CHIMES = [
+            { id: 'airport', name: 'جرس المطار الكلاسيكي (Ding-Dong-Dang)' },
+            { id: 'urgent', name: 'إنذار التحميل السريع (طنين متكرر)' },
+            { id: 'gentle', name: 'رنين هادئ وخفيف (نغمتين)' },
+            { id: 'modern', name: 'نغمة ديجيتال متصاعدة' }
+        ];
+
+        // Supabase & Firebase Configs
+        const SUPABASE_URL = 'https://YOUR_SUPABASE_PROJECT.supabase.co';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        let supabaseClient = null;
+        try {
+            if (window.supabase) {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            }
+        } catch(e) {}
+
+        // ==========================================
+        // 🚀 INITIALIZATION
+        // ==========================================
         window.onload = function() {
-            loadFromStorage();
-            if (!appData.drivers || appData.drivers.length === 0) seedData();
-            
-            // تهيئة إشعارات الويب من فايربيس
-            initFirebaseMessaging();
+            loadRegistriesFromStorage();
+            seedDefaultRegistriesIfEmpty();
+            initChimeSelectUI();
+            initSession();
             initSupabaseRealtime();
+            initFirebaseMessaging();
 
             if (syncChannel) {
                 syncChannel.onmessage = function(event) {
-                    if (event.data && event.data.type === 'SYNC_UPDATE') {
-                        appData.drivers = event.data.drivers;
-                        appData.activeCall = event.data.activeCall;
-                        renderAll();
-
-                        if (event.data.action === 'CALL_DRIVER' && appData.currentRole === 'driver') {
-                            triggerDriverScreenAlert(event.data.callInfo);
+                    if (event.data && event.data.type === 'SYNC_REGISTRY') {
+                        const { target, registryData, action, callInfo } = event.data;
+                        if (target && registries[target]) {
+                            registries[target] = registryData;
+                            renderAll();
+                        }
+                        if (action === 'CALL_DRIVER') {
+                            // If current user is a driver on the matching station, trigger audio and alert
+                            if (currentUser && currentUser.role === 'driver' && currentDriverStation === target) {
+                                triggerDriverScreenAlert(callInfo);
+                            }
                         }
                     }
                 };
             }
-            renderAll();
         };
 
-        function seedData() {
+        function seedDefaultRegistriesIfEmpty() {
             const now = Date.now();
-            appData.drivers = [
-                { id: '1', name: 'أحمد صالح المرقشي', busNum: '10293 / أبين', prefDest: 'عدن', status: 'WAITING', regTime: now - 3600000 * 2 },
-                { id: '2', name: 'عمار محسن العمودي', busNum: '5812 / أبين', prefDest: 'زنجبار', status: 'WAITING', regTime: now - 3600000 * 1.5 }
-            ];
-            saveAndSync('SEED');
+            let changed = false;
+
+            if (!registries.terminal.drivers || registries.terminal.drivers.length === 0) {
+                registries.terminal.drivers = [
+                    { id: 't1', name: 'أحمد صالح المرقشي', busNum: '10293 / أبين', prefDest: 'عدن', status: 'WAITING', regTime: now - 3600000 * 2 },
+                    { id: 't2', name: 'عمار محسن العمودي', busNum: '5812 / أبين', prefDest: 'زنجبار', status: 'WAITING', regTime: now - 3600000 * 1.5 }
+                ];
+                changed = true;
+            }
+
+            if (!registries.roundabout.drivers || registries.roundabout.drivers.length === 0) {
+                registries.roundabout.drivers = [
+                    { id: 'r1', name: 'فضل سالم النخعي', busNum: '7721 / أبين', prefDest: 'جعار', status: 'WAITING', regTime: now - 3600000 * 1.8 },
+                    { id: 'r2', name: 'سالم عبدالله الكازمي', busNum: '9904 / أبين', prefDest: 'عدن', status: 'WAITING', regTime: now - 3600000 * 1.1 }
+                ];
+                changed = true;
+            }
+
+            if (changed) saveRegistriesToStorage();
         }
 
-        function saveAndSync(actionName = 'UPDATE', extraPayload = {}) {
+        function loadRegistriesFromStorage() {
             try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    drivers: appData.drivers,
-                    activeCall: appData.activeCall
-                }));
-            } catch(e) {}
+                const termSaved = localStorage.getItem(STORAGE_KEY_TERMINAL);
+                if (termSaved) registries.terminal = JSON.parse(termSaved);
+                const roundSaved = localStorage.getItem(STORAGE_KEY_ROUNDABOUT);
+                if (roundSaved) registries.roundabout = JSON.parse(roundSaved);
+            } catch (e) {}
+        }
 
-            if (syncChannel) {
+        function saveRegistriesToStorage(target = null, actionName = 'UPDATE', extraPayload = {}) {
+            try {
+                if (!target || target === 'terminal') {
+                    localStorage.setItem(STORAGE_KEY_TERMINAL, JSON.stringify(registries.terminal));
+                }
+                if (!target || target === 'roundabout') {
+                    localStorage.setItem(STORAGE_KEY_ROUNDABOUT, JSON.stringify(registries.roundabout));
+                }
+            } catch (e) {}
+
+            if (syncChannel && target) {
                 syncChannel.postMessage({
-                    type: 'SYNC_UPDATE',
+                    type: 'SYNC_REGISTRY',
+                    target: target,
+                    registryData: registries[target],
                     action: actionName,
-                    drivers: appData.drivers,
-                    activeCall: appData.activeCall,
                     ...extraPayload
                 });
             }
         }
 
-        function loadFromStorage() {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                try {
-                    const parsed = JSON.parse(saved);
-                    appData.drivers = parsed.drivers || [];
-                    appData.activeCall = parsed.activeCall || null;
-                } catch(e) {}
+        // ==========================================
+        // 🔐 SESSION & AUTHENTICATION HANDLERS
+        // ==========================================
+        function initSession() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY_SESSION);
+                if (saved) {
+                    currentUser = JSON.parse(saved);
+                    applyUserSession();
+                    return;
+                }
+            } catch (e) {}
+            // Launch directly into Login screen
+            showLoginScreen();
+        }
+
+        function showLoginScreen() {
+            document.getElementById('viewLogin').classList.remove('hidden');
+        }
+
+        function selectLoginPath(path) {
+            const adminBtn = document.getElementById('loginPathAdminBtn');
+            const driverBtn = document.getElementById('loginPathDriverBtn');
+            const adminForm = document.getElementById('adminLoginForm');
+            const driverForm = document.getElementById('driverLoginForm');
+
+            if (path === 'admin') {
+                adminBtn.className = "p-4 rounded-2xl border-2 border-amber-500 bg-amber-500/10 transition text-center space-y-2";
+                driverBtn.className = "p-4 rounded-2xl border-2 border-slate-700 bg-slate-800/80 transition text-center space-y-2 opacity-60";
+                adminForm.classList.remove('hidden');
+                driverForm.classList.add('hidden');
+            } else {
+                driverBtn.className = "p-4 rounded-2xl border-2 border-brand-500 bg-brand-500/10 transition text-center space-y-2";
+                adminBtn.className = "p-4 rounded-2xl border-2 border-slate-700 bg-slate-800/80 transition text-center space-y-2 opacity-60";
+                driverForm.classList.remove('hidden');
+                adminForm.classList.add('hidden');
             }
         }
 
-        function switchRole(role) {
-            appData.currentRole = role;
-            const btnDel = document.getElementById('btnRoleDelegate');
-            const btnDrv = document.getElementById('btnRoleDriver');
+        function executeAdminLogin() {
+            const role = document.getElementById('adminRoleSelect').value;
+            const pin = document.getElementById('adminPinInput').value;
+
+            if (!pin) {
+                showInAppToast("يرجى إدخال رمز التحقق.");
+                return;
+            }
+
+            let roleName = "مسؤول";
+            if (role === 'president') roleName = "رئيس النقابة (رقابة عامة)";
+            else if (role === 'delegate_terminal') roleName = "مندوب الفرزة (المحطة الرئيسية)";
+            else if (role === 'delegate_roundabout') roleName = "مندوب الجولة";
+
+            currentUser = {
+                role: role,
+                name: roleName,
+                loginTime: Date.now()
+            };
+
+            localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(currentUser));
+            document.getElementById('viewLogin').classList.add('hidden');
+            applyUserSession();
+            showInAppToast(`مرحباً بك: ${roleName}`);
+        }
+
+        function executeDriverLogin() {
+            const inputVal = document.getElementById('driverLoginInput').value.trim();
+            currentUser = {
+                role: 'driver',
+                name: inputVal || 'سائق باص',
+                loginTime: Date.now()
+            };
+
+            localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(currentUser));
+            document.getElementById('viewLogin').classList.add('hidden');
+            applyUserSession();
+            showInAppToast("تم الدخول إلى شاشة السائقين");
+        }
+
+        function logoutSession() {
+            currentUser = null;
+            localStorage.removeItem(STORAGE_KEY_SESSION);
+            showLoginScreen();
+        }
+
+        function applyUserSession() {
+            if (!currentUser) {
+                showLoginScreen();
+                return;
+            }
+
+            const badge = document.getElementById('sessionRoleBadge');
+            const viewPres = document.getElementById('viewPresident');
             const viewDel = document.getElementById('viewDelegate');
             const viewDrv = document.getElementById('viewDriver');
 
-            if (role === 'delegate') {
+            viewPres.classList.add('hidden');
+            viewDel.classList.add('hidden');
+            viewDrv.classList.add('hidden');
+
+            if (currentUser.role === 'president') {
+                badge.innerHTML = `<i class="fa-solid fa-crown text-purple-400"></i> <span class="text-purple-300 font-extrabold">رئيس النقابة (رقابة قراءة فقط)</span>`;
+                viewPres.classList.remove('hidden');
+            } else if (currentUser.role === 'delegate_terminal') {
+                badge.innerHTML = `<i class="fa-solid fa-building text-amber-400"></i> <span class="text-amber-300 font-extrabold">مندوب فرزة المحطة</span>`;
                 viewDel.classList.remove('hidden');
-                viewDrv.classList.add('hidden');
-                btnDel.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-brand-600 text-white shadow-md";
-                btnDrv.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-400 hover:text-white";
-            } else {
-                viewDel.classList.add('hidden');
+                setupDelegateWorkspace('terminal');
+            } else if (currentUser.role === 'delegate_roundabout') {
+                badge.innerHTML = `<i class="fa-solid fa-route text-emerald-400"></i> <span class="text-emerald-300 font-extrabold">مندوب فرزة الجولة</span>`;
+                viewDel.classList.remove('hidden');
+                setupDelegateWorkspace('roundabout');
+            } else if (currentUser.role === 'driver') {
+                badge.innerHTML = `<i class="fa-solid fa-van-shuttle text-brand-400"></i> <span class="text-brand-300 font-extrabold">سائق باص</span>`;
                 viewDrv.classList.remove('hidden');
-                btnDrv.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-amber-500 text-slate-950 shadow-md";
-                btnDel.className = "px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-400 hover:text-white";
             }
+
             renderAll();
         }
 
-        function openDriverWindow() {
-            window.open(window.location.href, '_blank', 'width=500,height=800');
+        function setupDelegateWorkspace(type) {
+            const title = document.getElementById('delegateWorkspaceTitle');
+            const subtitle = document.getElementById('delegateWorkspaceSubtitle');
+            const icon = document.getElementById('delegateWorkspaceIcon');
+
+            if (type === 'terminal') {
+                title.innerText = "سجل فرزة أبين - المحطة الرئيسية";
+                subtitle.innerText = "صلاحيات كاملة لإدارة طابور المحطة والنداء المباشر";
+                icon.className = "w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl";
+                icon.innerHTML = `<i class="fa-solid fa-building"></i>`;
+            } else {
+                title.innerText = "سجل فرزة نقطة الجولة";
+                subtitle.innerText = "صلاحيات كاملة لإدارة طابور الجولة والنداء المباشر";
+                icon.className = "w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl";
+                icon.innerHTML = `<i class="fa-solid fa-route"></i>`;
+            }
+
+            // Ensure write controls are enabled for the delegate
+            const addBtn = document.getElementById('btnOpenAddBus');
+            const resetBtn = document.getElementById('btnResetDay');
+            if (addBtn) addBtn.classList.remove('hidden');
+            if (resetBtn) resetBtn.classList.remove('hidden');
         }
 
+        // ==========================================
+        // 🛡️ STRICT RBAC & PERMISSION ENFORCEMENT
+        // ==========================================
+        function enforcePermission(actionName, targetRegistry) {
+            if (!currentUser) {
+                showInAppToast("⛔ يجب تسجيل الدخول أولاً.");
+                return false;
+            }
+
+            // RULE 1: UNION PRESIDENT IS STRICTLY READ-ONLY
+            if (currentUser.role === 'president') {
+                showInAppToast("⛔ تم الحظر أمنياً: حساب رئيس النقابة مخصص للرقابة والاطلاع فقط ولا يمتلك صلاحيات التعديل أو الحذف.");
+                return false;
+            }
+
+            // RULE 2: DELEGATE SANDBOX ISOLATION
+            if (currentUser.role === 'delegate_terminal' && targetRegistry !== 'terminal') {
+                showInAppToast("⛔ تم حظر العملية: ليس لديك صلاحية على سجل نقطة الجولة.");
+                return false;
+            }
+
+            if (currentUser.role === 'delegate_roundabout' && targetRegistry !== 'roundabout') {
+                showInAppToast("⛔ تم حظر العملية: ليس لديك صلاحية على سجل فرزة المحطة.");
+                return false;
+            }
+
+            // RULE 3: DRIVER HAS NO WRITE PRIVILEGES
+            if (currentUser.role === 'driver') {
+                showInAppToast("⛔ غير مصرح للسائق بإجراء عمليات التعديل.");
+                return false;
+            }
+
+            return true;
+        }
+
+        function getActiveDelegateRegistryKey() {
+            if (currentUser && currentUser.role === 'delegate_roundabout') return 'roundabout';
+            return 'terminal';
+        }
+
+        // ==========================================
+        // 👑 UNION PRESIDENT CONTROLS
+        // ==========================================
+        function switchPresidentViewDelegate(target) {
+            currentPresidentInspectTarget = target;
+            const tabTerm = document.getElementById('presTabTerminal');
+            const tabRound = document.getElementById('presTabRoundabout');
+
+            if (target === 'terminal') {
+                tabTerm.className = "px-4 py-2 rounded-xl text-xs font-black transition bg-brand-600 text-white shadow-md flex items-center gap-1.5";
+                tabRound.className = "px-4 py-2 rounded-xl text-xs font-black transition text-slate-400 hover:text-white bg-slate-900 border border-slate-700 flex items-center gap-1.5";
+            } else {
+                tabRound.className = "px-4 py-2 rounded-xl text-xs font-black transition bg-emerald-600 text-white shadow-md flex items-center gap-1.5";
+                tabTerm.className = "px-4 py-2 rounded-xl text-xs font-black transition text-slate-400 hover:text-white bg-slate-900 border border-slate-700 flex items-center gap-1.5";
+            }
+
+            renderPresidentDashboard();
+        }
+
+        function renderPresidentDashboard() {
+            // Calculate Aggregate Stats
+            const termWaiting = registries.terminal.drivers.filter(d => d.status === 'WAITING').length;
+            const roundWaiting = registries.roundabout.drivers.filter(d => d.status === 'WAITING').length;
+
+            const termDeparted = registries.terminal.drivers.filter(d => d.status === 'DEPARTED').length;
+            const roundDeparted = registries.roundabout.drivers.filter(d => d.status === 'DEPARTED').length;
+            const totalDeparted = termDeparted + roundDeparted;
+            const totalPassengers = totalDeparted * 14;
+
+            document.getElementById('presStatTerminalWaiting').innerText = termWaiting;
+            document.getElementById('presStatRoundaboutWaiting').innerText = roundWaiting;
+            document.getElementById('presStatTotalDeparted').innerText = totalDeparted;
+            document.getElementById('presStatTotalPassengers').innerText = totalPassengers;
+
+            // Render inspection workspace for selected delegate
+            const target = currentPresidentInspectTarget;
+            const reg = registries[target];
+            const targetName = (target === 'terminal') ? 'فرزة المحطة الرئيسية' : 'فرزة نقطة الجولة';
+
+            const container = document.getElementById('presidentInspectWorkspace');
+            const waitingList = reg.drivers.filter(d => d.status === 'WAITING');
+            const departedList = reg.drivers.filter(d => d.status === 'DEPARTED');
+
+            container.innerHTML = `
+                <!-- INSPECTION HEADER -->
+                <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 flex justify-between items-center">
+                    <div>
+                        <h4 class="font-extrabold text-white text-sm">معاينة سجل: <span class="text-amber-400">${targetName}</span></h4>
+                        <p class="text-xs text-slate-400">بيانات حية مباشرة - أزرار التعديل معطلة بحكم صلاحية الرقابة</p>
+                    </div>
+                    <span class="bg-slate-700 text-slate-300 text-xs px-2.5 py-1 rounded-xl font-bold font-mono">طابور الانتظار: ${waitingList.length} باص</span>
+                </div>
+
+                <!-- ACTIVE LOADING CALL (IF ANY) -->
+                ${reg.activeCall ? `
+                    <div class="bg-gradient-to-r from-emerald-950 to-slate-900 border-2 border-emerald-500/80 p-4 rounded-2xl shadow-xl space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="bg-emerald-500 text-slate-950 px-2.5 py-0.5 rounded-full text-xs font-black">باص قيد التحميل حالياً (اطلاع فقط)</span>
+                            <span class="text-xs text-emerald-300 font-mono">تم النداء: ${new Date(reg.activeCall.timestamp).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="text-lg font-black text-white">${escapeHtml(reg.activeCall.driverName)}</h3>
+                                <p class="text-xs text-slate-300 font-mono font-bold">${escapeHtml(reg.activeCall.busNum)}</p>
+                            </div>
+                            <span class="bg-slate-900 px-3 py-1.5 rounded-xl border border-emerald-500/30 text-xs text-amber-400 font-bold">الوجهة: ${escapeHtml(reg.activeCall.destination)}</span>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- WAITING QUEUE TABLE (READ ONLY) -->
+                <div class="bg-slate-800/90 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
+                    <div class="p-3 bg-slate-900/80 border-b border-slate-700 flex justify-between items-center">
+                        <h5 class="font-bold text-xs text-slate-200">طابور الانتظار (سجل ${targetName})</h5>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-slate-900/50 text-slate-400 font-bold border-b border-slate-700">
+                                <tr>
+                                    <th class="p-2.5 text-center w-12">الدور</th>
+                                    <th class="p-2.5">اسم السائق</th>
+                                    <th class="p-2.5">رقم الباص</th>
+                                    <th class="p-2.5">الوجهة</th>
+                                    <th class="p-2.5">وقت التسجيل</th>
+                                    <th class="p-2.5 text-center text-purple-300">حالة الصلاحية</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700/60">
+                                ${waitingList.length === 0 ? `
+                                    <tr><td colspan="6" class="p-6 text-center text-slate-500">لا يوجد باصات منتظرة في هذا السجل حالياً.</td></tr>
+                                ` : waitingList.map((driver, idx) => `
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="p-2.5 text-center font-bold text-amber-400">${idx + 1}</td>
+                                        <td class="p-2.5 font-bold text-white">${escapeHtml(driver.name)}</td>
+                                        <td class="p-2.5 font-mono text-slate-300">${escapeHtml(driver.busNum)}</td>
+                                        <td class="p-2.5 font-bold text-amber-300">${escapeHtml(driver.prefDest || '--')}</td>
+                                        <td class="p-2.5 text-slate-400 font-mono">${new Date(driver.regTime).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
+                                        <td class="p-2.5 text-center">
+                                            <span class="bg-purple-950/80 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-lg text-[10px] font-bold">قراءة فقط</span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- DEPARTED LOG (READ ONLY) -->
+                <div class="bg-slate-800/90 rounded-2xl border border-slate-700 p-4 space-y-3">
+                    <h5 class="font-bold text-xs text-slate-300">سجل الباصات المغادرة اليوم (${targetName})</h5>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-slate-900/50 text-slate-400 font-bold border-b border-slate-700">
+                                <tr>
+                                    <th class="p-2">السائق</th>
+                                    <th class="p-2">الباص</th>
+                                    <th class="p-2">الوجهة</th>
+                                    <th class="p-2 text-center">الركاب</th>
+                                    <th class="p-2">وقت المغادرة</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700/40">
+                                ${departedList.length === 0 ? `
+                                    <tr><td colspan="5" class="p-4 text-center text-slate-500">لا توجد رحلات مغادرة اليوم في هذا السجل.</td></tr>
+                                ` : departedList.map(d => `
+                                    <tr class="hover:bg-slate-800/30">
+                                        <td class="p-2 font-bold text-white">${escapeHtml(d.name)}</td>
+                                        <td class="p-2 font-mono text-amber-300">${escapeHtml(d.busNum)}</td>
+                                        <td class="p-2 text-slate-300 font-bold">${escapeHtml(d.destination || d.prefDest || '')}</td>
+                                        <td class="p-2 text-center text-emerald-400 font-bold">${d.passengers || 14}</td>
+                                        <td class="p-2 text-slate-400 font-mono">${new Date(d.departTime || Date.now()).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==========================================
+        // 🔄 RENDERING PIPELINE
+        // ==========================================
         function renderAll() {
-            renderDelegateStats();
-            renderDelegateQueue();
-            renderDelegateDeparted();
-            renderActiveCallBanner();
-            renderDriverView();
+            if (!currentUser) return;
+
+            if (currentUser.role === 'president') {
+                renderPresidentDashboard();
+            } else if (currentUser.role.startsWith('delegate')) {
+                renderDelegateWorkspaceView();
+            } else if (currentUser.role === 'driver') {
+                renderDriverView();
+            }
         }
 
-        function renderDelegateStats() {
-            const waiting = appData.drivers.filter(d => d.status === 'WAITING').length;
-            const departed = appData.drivers.filter(d => d.status === 'DEPARTED').length;
-            const active = appData.activeCall ? 1 : 0;
+        function renderDelegateWorkspaceView() {
+            const target = getActiveDelegateRegistryKey();
+            const reg = registries[target];
+
+            const waiting = reg.drivers.filter(d => d.status === 'WAITING').length;
+            const departed = reg.drivers.filter(d => d.status === 'DEPARTED').length;
+            const active = reg.activeCall ? 1 : 0;
+
             document.getElementById('delStatWaiting').innerText = waiting;
             document.getElementById('delStatActive').innerText = active;
             document.getElementById('delStatDeparted').innerText = departed;
             document.getElementById('delStatPassengers').innerText = departed * 14;
             document.getElementById('queueCountBadge').innerText = `${waiting} باص`;
+
+            renderActiveCallBanner(reg);
+            renderDelegateQueue(reg);
+            renderDelegateDeparted(reg);
         }
 
-        function renderDelegateQueue() {
+        function renderActiveCallBanner(reg) {
+            const banner = document.getElementById('activeCallBanner');
+            if (!reg.activeCall) {
+                banner.classList.add('hidden');
+                return;
+            }
+            banner.classList.remove('hidden');
+            document.getElementById('activeDriverName').innerText = reg.activeCall.driverName;
+            document.getElementById('activeBusInfo').innerText = `الباص: ${reg.activeCall.busNum}`;
+            document.getElementById('activeDestination').innerText = reg.activeCall.destination;
+            document.getElementById('activeCallTime').innerText = 'تم النداء: ' + new Date(reg.activeCall.timestamp).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function renderDelegateQueue(reg) {
             const tbody = document.getElementById('delegateQueueBody');
             const emptyMsg = document.getElementById('emptyQueueMsg');
             tbody.innerHTML = '';
-            const waitingList = appData.drivers.filter(d => d.status === 'WAITING');
+            const waitingList = reg.drivers.filter(d => d.status === 'WAITING');
 
             if (waitingList.length === 0) {
                 emptyMsg.classList.remove('hidden');
@@ -929,18 +1162,27 @@
                 tr.className = isNext ? 'bg-amber-500/10 font-bold border-l-4 border-amber-500' : 'hover:bg-slate-800/40';
 
                 tr.innerHTML = `
-                    <td class="p-3 text-center"><span class="w-6 h-6 rounded-lg ${isNext ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-700 text-slate-300'} inline-flex items-center justify-center text-xs">${turnNum}</span></td>
-                    <td class="p-3 font-bold text-white">${escapeHtml(driver.name)}</td>
-                    <td class="p-3"><span class="font-mono bg-slate-900 px-2 py-1 rounded text-amber-300">${escapeHtml(driver.busNum)}</span></td>
-                    <td class="p-3 text-slate-300">${escapeHtml(driver.prefDest || 'غير محدد')}</td>
-                    <td class="p-3 text-slate-400 text-[11px]">${new Date(driver.regTime).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
                     <td class="p-3 text-center">
-                        <button onclick="moveQueue('${driver.id}', -1)" ${idx === 0 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-chevron-up"></i></button>
-                        <button onclick="moveQueue('${driver.id}', 1)" ${idx === waitingList.length - 1 ? 'disabled class="opacity-30"' : ''}><i class="fa-solid fa-chevron-down"></i></button>
+                        <span class="w-6 h-6 rounded-full inline-flex items-center justify-center text-xs ${isNext ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-800 text-slate-300'}">${turnNum}</span>
+                    </td>
+                    <td class="p-3 font-bold text-white">${escapeHtml(driver.name)}</td>
+                    <td class="p-3 font-mono text-amber-300 font-bold">${escapeHtml(driver.busNum)}</td>
+                    <td class="p-3"><span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-lg">${escapeHtml(driver.prefDest || 'عدن')}</span></td>
+                    <td class="p-3 text-slate-400 font-mono">${new Date(driver.regTime).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td class="p-3 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="moveQueue('${driver.id}', -1)" ${idx === 0 ? 'disabled' : ''} class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center">
+                                <i class="fa-solid fa-arrow-up text-[10px]"></i>
+                            </button>
+                            <button onclick="moveQueue('${driver.id}', 1)" ${idx === waitingList.length - 1 ? 'disabled' : ''} class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center">
+                                <i class="fa-solid fa-arrow-down text-[10px]"></i>
+                            </button>
+                        </div>
                     </td>
                     <td class="p-3 text-center">
-                        <button onclick="openTriggerCallModal('${driver.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs">
-                            <i class="fa-solid fa-microphone"></i> نداء صوتي
+                        <button onclick="openTriggerCallModal('${driver.id}')" class="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black px-3 py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md mx-auto transition">
+                            <i class="fa-solid fa-microphone"></i>
+                            <span>نداء للتحميل</span>
                         </button>
                     </td>
                 `;
@@ -948,40 +1190,12 @@
             });
         }
 
-        function moveQueue(id, direction) {
-            const waitingIndices = [];
-            appData.drivers.forEach((d, index) => { if (d.status === 'WAITING') waitingIndices.push(index); });
-            const currWaitingPos = waitingIndices.findIndex(idx => appData.drivers[idx].id === id);
-            if (currWaitingPos === -1) return;
-            const targetWaitingPos = currWaitingPos + direction;
-            if (targetWaitingPos < 0 || targetWaitingPos >= waitingIndices.length) return;
-
-            const actualCurrIdx = waitingIndices[currWaitingPos];
-            const actualTargetIdx = waitingIndices[targetWaitingPos];
-            const temp = appData.drivers[actualCurrIdx];
-            appData.drivers[actualCurrIdx] = appData.drivers[actualTargetIdx];
-            appData.drivers[actualTargetIdx] = temp;
-
-            saveAndSync('MOVE_QUEUE');
-            renderAll();
-        }
-
-        function renderActiveCallBanner() {
-            const banner = document.getElementById('activeCallBanner');
-            if (!appData.activeCall) { banner.classList.add('hidden'); return; }
-            banner.classList.remove('hidden');
-            document.getElementById('activeDriverName').innerText = appData.activeCall.driverName;
-            document.getElementById('activeBusInfo').innerText = `الباص: ${appData.activeCall.busNum}`;
-            document.getElementById('activeDestination').innerText = appData.activeCall.destination;
-            document.getElementById('activeCallTime').innerText = 'تم النداء: ' + new Date(appData.activeCall.timestamp).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
-        }
-
-        function renderDelegateDeparted() {
+        function renderDelegateDeparted(reg) {
             const tbody = document.getElementById('delegateDepartedBody');
             tbody.innerHTML = '';
-            const departed = appData.drivers.filter(d => d.status === 'DEPARTED');
+            const departed = reg.drivers.filter(d => d.status === 'DEPARTED');
             if (departed.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">لا توجد رحلات مغادرة اليوم.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">لا توجد رحلات مغادرة اليوم في هذا السجل.</td></tr>`;
                 return;
             }
             departed.forEach(d => {
@@ -989,38 +1203,68 @@
                     <tr class="hover:bg-slate-800/30">
                         <td class="p-2 font-bold text-white">${escapeHtml(d.name)}</td>
                         <td class="p-2 font-mono text-amber-300">${escapeHtml(d.busNum)}</td>
-                        <td class="p-2 text-slate-300 font-bold">${escapeHtml(d.destination)}</td>
+                        <td class="p-2 text-slate-300 font-bold">${escapeHtml(d.destination || d.prefDest || '')}</td>
                         <td class="p-2 text-center text-emerald-400 font-bold">${d.passengers || 14}</td>
-                        <td class="p-2 text-slate-400">${new Date(d.departTime).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td class="p-2 text-slate-400">${new Date(d.departTime || Date.now()).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</td>
                         <td class="p-2 text-center"><button onclick="revertDeparted('${d.id}')" class="text-slate-400 hover:text-amber-400"><i class="fa-solid fa-rotate-left"></i></button></td>
                     </tr>
                 `;
             });
         }
 
+        // ==========================================
+        // 🚐 DRIVER VIEW LOGIC
+        // ==========================================
+        function onDriverStationChanged(station) {
+            currentDriverStation = station;
+            document.getElementById('driverActiveStationLabel').innerText = (station === 'terminal') ? 'فرزة المحطة الرئيسية' : 'فرزة الجولة';
+            renderDriverView();
+        }
+
         function renderDriverView() {
+            const target = currentDriverStation;
+            const reg = registries[target];
             const activeContent = document.getElementById('driverActiveContent');
             const queueCards = document.getElementById('driverQueueCards');
 
-            if (appData.activeCall) {
+            if (reg.activeCall) {
                 activeContent.innerHTML = `
                     <div class="flex flex-wrap justify-between items-center gap-3 bg-slate-950/40 p-3 rounded-2xl border border-amber-400/30">
                         <div>
-                            <h2 class="text-2xl font-black text-white">${escapeHtml(appData.activeCall.driverName)}</h2>
-                            <p class="text-xs font-mono font-bold text-slate-900 bg-amber-400 inline-block px-2 py-0.5 rounded mt-1">${escapeHtml(appData.activeCall.busNum)}</p>
+                            <h2 class="text-2xl font-black text-white">${escapeHtml(reg.activeCall.driverName)}</h2>
+                            <p class="text-xs font-mono font-bold text-slate-900 bg-amber-400 inline-block px-2 py-0.5 rounded mt-1">${escapeHtml(reg.activeCall.busNum)}</p>
                         </div>
                         <div class="text-left space-y-2">
-                            <span class="text-xs font-bold text-slate-900 block">الوجهة: <strong class="bg-white px-2 py-1 rounded">${escapeHtml(appData.activeCall.destination)}</strong></span>
-                            ${appData.activeCall.audioUrl ? `<audio controls src="${appData.activeCall.audioUrl}" class="h-9 w-48"></audio>` : ''}
+                            <span class="text-xs font-bold text-slate-900 block">الوجهة: <strong class="bg-white px-2 py-1 rounded">${escapeHtml(reg.activeCall.destination)}</strong></span>
+                            ${reg.activeCall.audioUrl ? `<audio controls src="${reg.activeCall.audioUrl}" class="h-9 w-48"></audio>` : ''}
                         </div>
                     </div>
                 `;
             } else {
-                activeContent.innerHTML = `<div class="p-3 text-center text-slate-900 font-extrabold text-xs">لا يوجد نداء حالياً. تابع دورك بالطابور أدناه.</div>`;
+                activeContent.innerHTML = `<div class="p-3 text-center text-slate-900 font-extrabold text-xs">لا يوجد نداء حالياً في هذه الفرزة. تابع دورك بالطابور أدناه.</div>`;
             }
 
             queueCards.innerHTML = '';
-            const waitingList = appData.drivers.filter(d => d.status === 'WAITING');
+            const waitingList = reg.drivers.filter(d => d.status === 'WAITING');
+
+            // Search Filter
+            const searchInput = document.getElementById('driverSearchInput');
+            const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+            const searchResultBox = document.getElementById('driverSearchResult');
+
+            if (query && searchResultBox) {
+                const matchIdx = waitingList.findIndex(d => d.name.toLowerCase().includes(query) || d.busNum.toLowerCase().includes(query));
+                if (matchIdx !== -1) {
+                    searchResultBox.classList.remove('hidden');
+                    searchResultBox.innerHTML = `<strong>نتيجة البحث:</strong> أنت صاحب الدور <strong>(${matchIdx + 1})</strong> في طابور ${target === 'terminal' ? 'المحطة' : 'الجولة'}. باقي أمامك <strong>${matchIdx}</strong> باص للتحميل.`;
+                } else {
+                    searchResultBox.classList.remove('hidden');
+                    searchResultBox.innerHTML = `لم يتم العثور على اسم أو رقم باص مطابق في طابور الانتظار الحالي.`;
+                }
+            } else if (searchResultBox) {
+                searchResultBox.classList.add('hidden');
+            }
+
             waitingList.forEach((driver, idx) => {
                 const turnNum = idx + 1;
                 const isNext = (idx === 0);
@@ -1042,17 +1286,124 @@
         }
 
         // ==========================================
-        // 🎙️ وظائف التسجيل الصوتي الحقيقي للمندوب
+        // ✍️ MUTATION OPERATIONS (PROTECTED BY RBAC)
+        // ==========================================
+        function handleAddBus(e) {
+            e.preventDefault();
+            const target = getActiveDelegateRegistryKey();
+
+            // Strict Security Guard
+            if (!enforcePermission('ADD_BUS', target)) return;
+
+            const name = document.getElementById('inputDriverName').value.trim();
+            const busNum = document.getElementById('inputBusNum').value.trim();
+            const prefDest = document.getElementById('inputPreferredDest').value;
+            if (!name || !busNum) return;
+
+            registries[target].drivers.push({
+                id: Date.now().toString(),
+                name,
+                busNum,
+                prefDest,
+                status: 'WAITING',
+                regTime: Date.now()
+            });
+
+            saveRegistriesToStorage(target, 'ADD_BUS');
+            renderAll();
+            closeModal('addBusModal');
+            document.getElementById('inputDriverName').value = '';
+            document.getElementById('inputBusNum').value = '';
+            showInAppToast(`تم تسجيل الباص (${busNum}) بنجاح.`);
+        }
+
+        function moveQueue(id, direction) {
+            const target = getActiveDelegateRegistryKey();
+            if (!enforcePermission('MOVE_QUEUE', target)) return;
+
+            const reg = registries[target];
+            const waitingIndices = [];
+            reg.drivers.forEach((d, index) => { if (d.status === 'WAITING') waitingIndices.push(index); });
+            const currWaitingPos = waitingIndices.findIndex(idx => reg.drivers[idx].id === id);
+            if (currWaitingPos === -1) return;
+            const targetWaitingPos = currWaitingPos + direction;
+            if (targetWaitingPos < 0 || targetWaitingPos >= waitingIndices.length) return;
+
+            const actualCurrIdx = waitingIndices[currWaitingPos];
+            const actualTargetIdx = waitingIndices[targetWaitingPos];
+            const temp = reg.drivers[actualCurrIdx];
+            reg.drivers[actualCurrIdx] = reg.drivers[actualTargetIdx];
+            reg.drivers[actualTargetIdx] = temp;
+
+            saveRegistriesToStorage(target, 'MOVE_QUEUE');
+            renderAll();
+        }
+
+        function finishLoadingAndDepart() {
+            const target = getActiveDelegateRegistryKey();
+            if (!enforcePermission('FINISH_DEPART', target)) return;
+
+            const reg = registries[target];
+            if (!reg.activeCall) return;
+
+            const driver = reg.drivers.find(d => d.id === reg.activeCall.driverId);
+            if (driver) {
+                driver.status = 'DEPARTED';
+                driver.destination = reg.activeCall.destination;
+                driver.passengers = 14;
+                driver.departTime = Date.now();
+            }
+            reg.activeCall = null;
+            saveRegistriesToStorage(target, 'DEPART_FINISH');
+            renderAll();
+            showInAppToast("تم تسجيل مغادرة الباص بنجاح");
+        }
+
+        function revertDeparted(id) {
+            const target = getActiveDelegateRegistryKey();
+            if (!enforcePermission('REVERT_DEPARTED', target)) return;
+
+            const driver = registries[target].drivers.find(d => d.id === id);
+            if (driver) {
+                driver.status = 'WAITING';
+                delete driver.destination;
+                delete driver.passengers;
+                delete driver.departTime;
+                saveRegistriesToStorage(target, 'REVERT_DEPARTED');
+                renderAll();
+                showInAppToast("تم التراجع وإعادة الباص إلى الطابور");
+            }
+        }
+
+        function resetDayData() {
+            const target = getActiveDelegateRegistryKey();
+            if (!enforcePermission('RESET_DAY', target)) return;
+
+            const targetName = (target === 'terminal') ? 'فرزة المحطة' : 'فرزة الجولة';
+            if (confirm(`هل أنت متأكد من تصفير سجلات ${targetName} بالكامل لليوم؟`)) {
+                registries[target].drivers = [];
+                registries[target].activeCall = null;
+                saveRegistriesToStorage(target, 'RESET_DAY');
+                renderAll();
+                showInAppToast(`تم تصفير سجلات ${targetName} بنجاح.`);
+            }
+        }
+
+        // ==========================================
+        // 🎙️ VOICE CALL & AUDIO NOTIFICATIONS
         // ==========================================
         function openTriggerCallModal(driverId) {
-            const driver = appData.drivers.find(d => d.id === driverId);
+            const target = getActiveDelegateRegistryKey();
+            if (!enforcePermission('OPEN_TRIGGER_CALL', target)) return;
+
+            const driver = registries[target].drivers.find(d => d.id === driverId);
             if (!driver) return;
+
             document.getElementById('callDriverId').value = driver.id;
             document.getElementById('callDriverName').innerText = driver.name;
             document.getElementById('callBusNum').innerText = `رقم الباص: ${driver.busNum}`;
             document.getElementById('callDestination').value = driver.prefDest || 'عدن';
             
-            // إعادة ضبط حالة التسجيل
             recordedAudioBlobUrl = null;
             document.getElementById('audioPreviewContainer').classList.add('hidden');
             document.getElementById('confirmCallBtn').disabled = true;
@@ -1075,12 +1426,11 @@
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                        recordedAudioBlobUrl = reader.result; // Base64 Data URL قابل للمزامنة عبر الشبكة والصفحات
+                        recordedAudioBlobUrl = reader.result;
                         const previewAudio = document.getElementById('audioPreview');
                         previewAudio.src = recordedAudioBlobUrl;
                         document.getElementById('audioPreviewContainer').classList.remove('hidden');
                         
-                        // تفعيل زر إرسال النداء
                         const confirmBtn = document.getElementById('confirmCallBtn');
                         if (confirmBtn) {
                             confirmBtn.disabled = false;
@@ -1111,77 +1461,54 @@
         }
 
         function confirmVoiceCall() {
+            const target = getActiveDelegateRegistryKey();
+            if (!enforcePermission('CONFIRM_CALL', target)) return;
+
             const id = document.getElementById('callDriverId').value;
             const dest = document.getElementById('callDestination').value;
-            const driver = appData.drivers.find(d => d.id === id);
+            const driver = registries[target].drivers.find(d => d.id === id);
 
             if (driver) {
-                appData.activeCall = {
+                registries[target].activeCall = {
                     driverId: driver.id,
                     driverName: driver.name,
                     busNum: driver.busNum,
                     destination: dest,
-                    audioUrl: recordedAudioBlobUrl, // رابط التسجيل الصوتي الحقيقي بصوتك
+                    audioUrl: recordedAudioBlobUrl,
                     timestamp: Date.now()
                 };
 
-                saveAndSync('CALL_DRIVER', { callInfo: appData.activeCall });
+                saveRegistriesToStorage(target, 'CALL_DRIVER', { callInfo: registries[target].activeCall });
                 renderAll();
                 closeModal('triggerCallModal');
+                showInAppToast(`تم بث النداء الصوتي للسائق: ${driver.name}`);
             }
         }
 
-        function finishLoadingAndDepart() {
-            if (!appData.activeCall) return;
-            const driver = appData.drivers.find(d => d.id === appData.activeCall.driverId);
-            if (driver) {
-                driver.status = 'DEPARTED';
-                driver.destination = appData.activeCall.destination;
-                driver.passengers = 14;
-                driver.departTime = Date.now();
+        async function sendSupabaseNotification() {
+            const driverName = document.getElementById('callDriverName').innerText;
+            const busNum = document.getElementById('callBusNum').innerText;
+            const destination = document.getElementById('callDestination').value;
+
+            const notifData = {
+                title: `تنبيه دور السائق: ${driverName}`,
+                body: `باص رقم (${busNum}) - الوجهة: ${destination}. يرجى التوجه للفرزة فوراً.`,
+                driver_name: driverName,
+                bus_num: busNum,
+                destination: destination
+            };
+
+            let inserted = false;
+            if (supabaseClient) {
+                try {
+                    const { data, error } = await supabaseClient.from('notifications').insert([notifData]);
+                    if (!error) inserted = true;
+                } catch (e) {}
             }
-            appData.activeCall = null;
-            saveAndSync('DEPART_FINISH');
-            renderAll();
-        }
 
-        function revertDeparted(id) {
-            const driver = appData.drivers.find(d => d.id === id);
-            if (driver) {
-                driver.status = 'WAITING';
-                delete driver.destination; delete driver.passengers; delete driver.departTime;
-                saveAndSync('REVERT_DEPARTED');
-                renderAll();
-            }
-        }
-
-        function resetDayData() {
-            if (confirm('تصفير سجلات اليوم بالكامل؟')) {
-                appData.drivers = [];
-                appData.activeCall = null;
-                saveAndSync('RESET_DAY');
-                renderAll();
-            }
-        }
-
-        function handleAddBus(e) {
-            e.preventDefault();
-            const name = document.getElementById('inputDriverName').value.trim();
-            const busNum = document.getElementById('inputBusNum').value.trim();
-            const prefDest = document.getElementById('inputPreferredDest').value;
-            if (!name || !busNum) return;
-
-            appData.drivers.push({
-                id: Date.now().toString(),
-                name, busNum, prefDest,
-                status: 'WAITING',
-                regTime: Date.now()
-            });
-            saveAndSync('ADD_BUS');
-            renderAll();
-            closeModal('addBusModal');
-            document.getElementById('inputDriverName').value = '';
-            document.getElementById('inputBusNum').value = '';
+            playNotificationChime();
+            showInAppToast(inserted ? `تم إرسال الإشعار إلى السائق ${driverName} بنجاح` : `تم بث التنبيه للسائق ${driverName}`);
+            closeModal('triggerCallModal');
         }
 
         function triggerDriverScreenAlert(callInfo) {
@@ -1200,20 +1527,175 @@
                 audioContainer.classList.add('hidden');
             }
 
+            playNotificationChime();
             document.getElementById('driverCallAlert').classList.remove('hidden');
         }
 
         function dismissAlert() {
             document.getElementById('driverCallAlert').classList.add('hidden');
             const audioPlayer = document.getElementById('alertAudioPlayer');
-            audioPlayer.pause();
+            if (audioPlayer) audioPlayer.pause();
+        }
+
+        // ==========================================
+        // 🔔 CHIME & AUDIO GENERATION
+        // ==========================================
+        function initChimeSelectUI() {
+            const select = document.getElementById('settingChimeSelect');
+            if (!select) return;
+            select.innerHTML = '';
+            PRESET_CHIMES.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                select.appendChild(opt);
+            });
+            const customOpt = document.createElement('option');
+            customOpt.value = 'custom';
+            customOpt.textContent = 'ملف نغمة مخصص من هاتفك';
+            select.appendChild(customOpt);
+
+            const savedChoice = localStorage.getItem(CHIME_CHOICE_KEY) || 'airport';
+            select.value = savedChoice;
+            customChimeBase64 = localStorage.getItem(CHIME_STORAGE_KEY) || null;
+        }
+
+        function onSelectChimeChanged(val) {
+            localStorage.setItem(CHIME_CHOICE_KEY, val);
+        }
+
+        function previewCurrentSelectedChime() {
+            playNotificationChime();
+        }
+
+        function handleCustomChimeUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                customChimeBase64 = e.target.result;
+                localStorage.setItem(CHIME_STORAGE_KEY, customChimeBase64);
+                localStorage.setItem(CHIME_CHOICE_KEY, 'custom');
+                document.getElementById('settingChimeSelect').value = 'custom';
+                const msg = document.getElementById('customChimeStatusMsg');
+                if (msg) msg.classList.remove('hidden');
+                showInAppToast("تم حفظ النغمة المخصصة بنجاح");
+                playNotificationChime();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function playNotificationChime() {
+            const choice = localStorage.getItem(CHIME_CHOICE_KEY) || 'airport';
+            if (choice === 'custom' && customChimeBase64) {
+                const audio = new Audio(customChimeBase64);
+                audio.play().catch(e => playPresetChime('airport'));
+            } else {
+                playPresetChime(choice);
+            }
+        }
+
+        function playPresetChime(presetId) {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                if (presetId === 'airport') {
+                    playNoteSequence([
+                        { freq: 587.33, duration: 0.25, time: 0 },
+                        { freq: 440.00, duration: 0.25, time: 0.22 },
+                        { freq: 659.25, duration: 0.45, time: 0.44 }
+                    ]);
+                } else if (presetId === 'urgent') {
+                    playNoteSequence([
+                        { freq: 880, duration: 0.12, time: 0 },
+                        { freq: 880, duration: 0.12, time: 0.18 },
+                        { freq: 880, duration: 0.25, time: 0.36 }
+                    ]);
+                } else if (presetId === 'gentle') {
+                    playNoteSequence([
+                        { freq: 523.25, duration: 0.3, time: 0 },
+                        { freq: 659.25, duration: 0.5, time: 0.3 }
+                    ]);
+                } else {
+                    playNoteSequence([
+                        { freq: 440, duration: 0.15, time: 0 },
+                        { freq: 554.37, duration: 0.15, time: 0.15 },
+                        { freq: 659.25, duration: 0.15, time: 0.30 },
+                        { freq: 880, duration: 0.35, time: 0.45 }
+                    ]);
+                }
+            } catch (e) {}
+        }
+
+        function playNoteSequence(notes) {
+            const now = audioCtx.currentTime;
+            notes.forEach(n => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(n.freq, now + n.time);
+                gain.gain.setValueAtTime(0.001, now + n.time);
+                gain.gain.exponentialRampToValueAtTime(0.3, now + n.time + 0.04);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + n.time + n.duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now + n.time);
+                osc.stop(now + n.time + n.duration);
+            });
+        }
+
+        // ==========================================
+        // 🌐 SUPABASE REALTIME & FIREBASE
+        // ==========================================
+        function initSupabaseRealtime() {
+            if (!supabaseClient) return;
+            try {
+                supabaseClient.channel('farza_abyan_live')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, payload => {
+                        if (payload.new) {
+                            showInAppToast(`تنبيه جديد: ${payload.new.title}`);
+                            playNotificationChime();
+                        }
+                    })
+                    .subscribe();
+            } catch (e) {}
+        }
+
+        function initFirebaseMessaging() {
+            // Firebase web messaging setup if available
+        }
+
+        // ==========================================
+        // 🛠️ UTILITY HELPERS
+        // ==========================================
+        function showInAppToast(msg) {
+            const c = document.getElementById('toastContainer');
+            if (!c) return;
+            const toast = document.createElement('div');
+            toast.className = "bg-slate-900/95 border border-amber-500/80 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 transform transition-all duration-300";
+            toast.innerHTML = `<i class="fa-solid fa-bell text-amber-400"></i> <span>${escapeHtml(msg)}</span>`;
+            c.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function openDriverWindow() {
+            window.open(window.location.href, '_blank', 'width=500,height=800');
         }
 
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
         function escapeHtml(str) {
             if (!str) return '';
-            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            return str.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
     </script>
 </body>
